@@ -1,0 +1,13 @@
+PyQt6
+torch
+torchvision
+torchaudio
+transformers
+accelerate
+scipy
+numpy
+nvidia-ml-py
+psutil
+pillow
+matplotlib
+diffusers
