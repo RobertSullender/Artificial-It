@@ -26,6 +26,33 @@ class ImagineItTab(QWidget):
         header.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 10px;")
         self.layout.addWidget(header)
 
+        # --- LIVE PREVIEW SECTION ---
+        self.live_status_label = QLabel("Ready")
+        self.live_status_label.setStyleSheet("""
+            background-color: #1a1a1a;
+            color: #00ff88;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            border-left: 4px solid #00ff88;
+            min-height: 60px;
+        """)
+
+        self.live_progress_label = QLabel("0%")
+        self.live_progress_label.setStyleSheet("""
+            background-color: #2b2b2b;
+            color: #888;
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+        """)
+
+        preview_layout = QHBoxLayout()
+        preview_layout.addWidget(self.live_status_label)
+        preview_layout.addStretch()
+        preview_layout.addWidget(self.live_progress_label)
+        self.layout.addLayout(preview_layout)
+
         # --- PERSISTENT INPUT SECTION ---
         input_group = QVBoxLayout()
         form_layout = QFormLayout()
@@ -166,7 +193,7 @@ class ImagineItTab(QWidget):
             
             task_id = str(uuid.uuid4())
             params = {
-                'model': self.model_selector.currentText(), 
+                'model': self.model_selector.currentText(),
                 'prompt': prompt,
                 'negative_prompt': neg_prompt,
                 'seed': self.seed_input.value(),
@@ -174,7 +201,7 @@ class ImagineItTab(QWidget):
                 'guidance_scale': self.cfg_input.value(),
                 'width': self.width_input.value(),
                 'height': self.height_input.value(),
-                'sampler': self.sampler_input.currentText()
+                'sampler': self.sampler_input.currentText(),
             }
             self.engine.submit_task(task_id, params)
         elif TokenCounter.count_tokens(prompt) > 77:
@@ -191,28 +218,37 @@ class ImagineItTab(QWidget):
             self.preview.display_text(f"Done! Result: {result}")
 
     def on_progress_updated(self, data):
-        """Updates the status label and checks if the image is ready to display."""
+        """Updates the live preview labels and checks if image is ready."""
         try:
-            # 1. Update the status text (Standard update)
-            status = data.get('status', '')
-            self.status_label.setText(f"Status: {status}")
+            # 1. Update live preview with new status
+            self._update_live_preview(data)
             
-            # 2. Check for an image path
+            # 2. Check for an image path (live preview)
             image_path = data.get('image_path')
             if image_path:
-                # If we get a new path, store it as the 'pending' image
-                self._current_image_path = image_path
-                
-                # Immediately check if it's ready
                 self._check_and_display(image_path)
-            else:
-                # Even if there's no image_path in THIS specific update, 
-                # the engine might still be writing the file from a previous update.
-                # So we check our 'pending' path again.
-                if self._current_image_path:
-                    self._check_and_display(self._current_image_path)
+                
         except Exception as e:
             print(f"Error in on_progress_updated: {e}")
+
+    def _update_live_preview(self, data):
+        """Thread-safe method to update live preview labels."""
+        status = data.get('status', '')
+        
+        if 'Step' in status and '/' in status:
+            # Extract step numbers like "Step 5/20"
+            try:
+                parts = status.split('/')
+                current_step = int(parts[0].replace('Step', '').strip())
+                total_steps = int(parts[1].strip())
+                percent = (current_step / total_steps) * 100
+                
+                self.live_status_label.setText(f"Generating: {status}")
+                self.live_progress_label.setText(f"{int(percent)}%")
+            except Exception as ex:
+                print(f"Error parsing progress: {ex}")
+        else:
+            self.live_status_label.setText(status if status else "Processing...")
 
     def _check_and_display(self, filepath):
         """Internal helper to verify file exists and is ready."""
