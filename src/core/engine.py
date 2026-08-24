@@ -40,7 +40,10 @@ class ExecutionEngine(QObject):
                 raise ValueError("No model specified in task parameters.")
             
             self.progress_updated.emit({"task_id": task_id, "status": f"Loading {model_name}..."})
-            model_obj = self.model_manager.load_model(model_name)
+            
+            # FIX: Run the synchronous load_model call in a separate thread to avoid blocking the event loop.
+            # This prevents the UI from freezing and avoids race conditions during initialization.
+            model_obj = await asyncio.to_thread(self.model_manager.load_model, model_name)
             
             if not model_obj:
                 raise RuntimeError(f"Failed to load model: {model_name}")
