@@ -1,0 +1,197 @@
+# 🔄 SESSION HANDOFF PROMPT - Artificial-It Project
+
+## Use this EXACT text when starting a NEW conversation/session about this project
+
+---
+
+## PROJECT CONTEXT: Artificial-It AI Image Generation Application
+
+You are continuing work on **Artificial-It**, a PyQt6-based desktop application for AI-powered image generation using Stable Diffusion models.
+
+---
+
+## 🎯 CRITICAL CURRENT STATUS (READ FIRST!)
+
+### ✅ What's WORKING Now
+1. **Model Loading**: Fixed with `asyncio.to_thread()` - no more crashes when clicking "Generate"
+2. **Basic Image Generation**: Fully functional, images are being produced
+3. **Live Preview UI**: Shows final generated images correctly
+4. **Git Repository**: Active with 2 commits already made
+
+### 🔴 What's BROKEN (Highest Priority)
+1. **Progress Bar Stuck at 0%**: Status text updates ("Step 5/20") but percentage never changes from "0%"
+   - File: `src/ui/tabs/imagine_it.py` (lines ~80-90 in on_progress_updated handler)
+   - Likely cause: Qt main thread requirement not met for UI updates
+   
+2. **Sampler Not Affecting Output**: Changing sampler dropdown has no effect on generated images
+   - Need to verify engine is actually using the sampler parameter from params dict
+
+### 📁 Key Files You NEED to Know
+```bash
+src/core/engine.py              # ExecutionEngine.run_task() - has asyncio.to_thread() fix
+src/ui/tabs/imagine_it.py       # Main UI with LIVE PREVIEW section (lines ~41-58)
+SESSION_LOGS/2025-08-23-session.log  # COMPLETE HISTORY of all work done today (READ THIS!)
+src/docs/CURRENT_TASK.md        # Active issues with priorities
+```
+
+---
+
+## 📋 IMMEDIATE ACTION ITEMS
+
+### Priority 1: Fix Progress Bar Display 🔴
+
+**Problem**: Progress percentage shows "0%" permanently despite status text updating correctly
+
+**What to investigate**:
+1. Add debug logging in `on_progress_updated()` to see what data engine is sending:
+   ```python
+   def on_progress_updated(self, data):
+       print(f"DEBUG: Progress data received: {data}")  # Add this line
+       self._update_live_preview(data)
+   ```
+
+2. Check if Qt main thread requirement is blocking updates - try adding:
+   ```python
+   import sys
+   
+   def _update_live_preview(self, data):
+       QApplication.invokeLater(
+           lambda: self._do_update_preview(data)
+       )
+       
+       def _do_update_preview(self, data):
+           # Your existing update logic here
+           if data.get("percentage"):
+               self.live_progress_label.setText(f"{data['percentage']}%")
+   ```
+
+3. Verify engine's `callback_on_step_end()` is emitting data with "Step X/20" format that your parser can extract
+
+**Test after fixing**: Run `python src/main.py` and watch if percentage updates from 5% → 10% → 15%... → 100% during generation
+
+---
+
+### Priority 2: Fix Sampler Parameter Integration 🟡
+
+**Problem**: User selects "Euler a" in dropdown but image still looks like default sampler was used
+
+**What to investigate**:
+1. In `src/core/engine.py`'s `run_task()`, add this debug line to see if sampler is in params:
+   ```python
+   async def run_task(self, task_id: str, params: Dict[str, Any]):
+       print(f"DEBUG Task params: {params}")  # Should show 'sampler' key
+       
+       sampler = params.get('sampler', 'euler')  # Fallback to euler if missing
+   ```
+
+2. Check the Diffusers pipeline call - likely needs explicit sampler specification:
+   ```python
+   # Look for something like this in engine.py:
+   pipeline = StableDiffusionPipeline.from_pretrained(
+       model_name,
+       # Add this line if missing:
+       custom_pipeline='some_sampler'  # Or use pipe.set_scheduler() method
+   )
+   ```
+
+**Test after fixing**: Change sampler dropdown to different options and verify image characteristics change visibly
+
+---
+
+## 📚 KNOWLEDGE BASE FOR YOU
+
+### Session Log (Your Complete History)
+```bash
+cat SESSION_LOGS/2025-08-23-session.log
+```
+This contains EVERYTHING we discussed today:
+- Exact code changes with line numbers
+- Debugging steps taken
+- Problem/solution pairs
+- Technical decisions made
+
+### Documentation Files
+```bash
+src/docs/CURRENT_TASK.md      # Issue tracker with priorities
+src/docs/TODO_LIST.md         # Feature roadmap (3 phases)
+src/docs/ARCHITECTURE.md      # System design and patterns used
+src/docs/PROJECT_SUMMARY.md   # High-level overview
+```
+
+### Git History
+```bash
+git log --oneline              # See commits we made
+git show 93a0e3f               # View first commit details (asyncio.to_thread fix)
+```
+
+---
+
+## 🧪 TESTING CHECKLIST
+
+After making fixes, verify these work:
+
+**Basic Generation Flow**:
+- [ ] Click "Generate" → No crash during model loading ✓ (already fixed)
+- [ ] Status text updates ("Loading...", "Step 1/20", etc.) ✓ (working)
+- [ ] **Progress percentage updates visually** ⚠️ (needs fixing)
+- [ ] Final image appears in preview window ✓ (already working)
+
+**Advanced Features**:
+- [ ] Sampler dropdown selection persists across generations ⚠️ (needs verification)
+- [ ] Different samplers produce visibly different outputs ⚠️ (needs testing after fix)
+- [ ] Seed randomization works correctly ✓ (user confirmed)
+
+---
+
+## 🛠️ COMMON COMMANDS YOU'LL NEED
+
+```bash
+# Start application with verbose output
+python src/main.py
+
+# Check what files changed since last commit
+git status
+
+# View pending changes before committing
+git diff
+
+# Stage a file for next commit
+git add <filename>
+
+# Create commit with descriptive message
+git commit -m "fix: describe what was fixed"
+
+# Read the complete session history (most important!)
+cat SESSION_LOGS/2025-08-23-session.log
+```
+
+---
+
+## ⚠️ CRITICAL NOTES
+
+1. **The session log is your bible** - Everything you need to understand context is in `SESSION_LOGS/2025-08-23-session.log`. Read it first before making any changes.
+
+2. **Progress bar issue is HIGH PRIORITY** - This blocks users from seeing generation progress. Start debugging this first.
+
+3. **Qt main thread requirement** - If you're updating UI from a worker thread, wrap updates in `QApplication.invokeLater()`.
+
+4. **Commit strategy** - We agreed to separate commits per issue for better traceability:
+   - Commit 1: Progress bar fix
+   - Commit 2: Sampler integration  
+   - Commit 3+: Future enhancements
+
+5. **GPU limitations** - User has ~1.6GB free VRAM, OOM errors are expected. Not blocking core functionality.
+
+---
+
+## 📞 WHAT TO TELL ME FIRST IN THIS SESSION
+
+When you start this new session, begin your message with:
+
+**"I've read the session log and documentation. My current understanding is: [your summary]. What should I tackle first?"**
+
+This ensures we're aligned before diving into debugging!
+
+---
+
+*Handoff created: 2025-08-23 | Project: Artificial-It v1.0*
