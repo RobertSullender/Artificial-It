@@ -90,7 +90,8 @@ class ExecutionEngine(QObject):
                                 pass
 
                             image = (image * 255).astype(np.uint8)
-                            preview_img = Image.fromarray(image).resize((512, 512), Image.Resampling.LANCZOS)
+                            # FIX: Resize to target dimensions instead of hardcoded 512x512
+                            preview_img = Image.fromarray(image).resize((width, height), Image.Resampling.LANCZOS)
 
                             preview_path = self.preview_dir / f"prev_{task_id}_{step_idx:03d}.png"
                             preview_img.save(str(preview_path))
@@ -138,6 +139,14 @@ class ExecutionEngine(QObject):
                 save_path = output_dir / filename
                 image.save(str(save_path))
                 
+                # FIX: Clean up intermediate preview files (they were temporary)
+                if self.preview_dir.exists():
+                    for f in self.preview_dir.glob("prev_*"):
+                        try:
+                            f.unlink()  # Delete intermediate previews
+                        except:
+                            pass  # Ignore cleanup errors
+
                 result = str(save_path)
                 self.progress_updated.emit({"task_id": task_id, "status": "Generation Complete!"})
             else:

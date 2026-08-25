@@ -3,7 +3,7 @@
 All notable changes to the Artificial-It project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project adheres to [Semantic Versioning]((https://semver.org/spec/v2.0.0.html).
 
 ---
 
@@ -23,6 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - PyQt6 signals are already thread-safe; manual wrappers unnecessary
   - Eliminates AttributeError and simplifies code
 
+### Enhanced
+- ✅ Fixed resolution morphing issue: Previews now use correct target dimensions instead of hardcoded 512×512
+- ✅ Implemented automatic cleanup: Intermediate preview files are removed after generation completes
+- Added comprehensive debug logging throughout execution pipeline
+- Created professional documentation system in `src/docs/`
+- Implemented session log tracking for development continuity
+
+### Planned Features (Under Review)
+- **Auto-incrementing output filenames**: Generate sequential numbered files (img_001.png, img_002.png, etc.) instead of timestamp-based naming
+  - Prevents overwriting previous generations with same filename
+  - Maintains organized, sortable output history
+  - Priority: High (user requested feature)
+
 ### Known Issues
 - Sampler parameter not affecting generation output (Diffusers v0.31+ architectural limitation)
   - Documented as known issue, disabled for future enhancement
@@ -30,11 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Progress percentage updates working but visual bar still at 0% (incomplete fix)
   - Status text updates correctly (5% → 10% → ... → 100%)
   - Visual progress bar widget needs additional configuration
-
-### Enhanced
-- Added comprehensive debug logging throughout execution pipeline
-- Created professional documentation system in `src/docs/`
-- Implemented session log tracking for development continuity
 
 ---
 
@@ -56,3 +64,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 *Changelog v0.1 | Last Updated: 2025-08-23*
+

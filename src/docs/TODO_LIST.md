@@ -8,8 +8,16 @@
 
 ## 🎯 Phase 1: Foundation Stabilization (Immediate - Next 1-2 Weeks)
 
-### Critical Bug Fixes 🔴
+### Critical Bug Fixes ✅ RESOLVED
+- [x] **Progress Bar Data Flow** - Updated callback signature for Diffusers v0.31+ API
 - [ ] **Progress Bar Visual Update** - HIGH PRIORITY
+  - Verify engine callback emits correct data format with progress percentage
+  - Test `QApplication.invokeLater()` wrapper for Qt main thread requirement
+  - Add debug logging to trace data flow from engine → UI handler
+  - Confirm "Step X/20" parsing logic matches actual engine output
+  - **Estimated Time**: 2-4 hours
+
+- [ ] **Sampler Parameter Integration** - MEDIUM PRIORITY
   - Verify engine callback emits correct data format with progress percentage
   - Test `QApplication.invokeLater()` wrapper for Qt main thread requirement
   - Add debug logging to trace data flow from engine → UI handler
@@ -74,11 +82,15 @@
   - Custom model repository management
   - Model version history and rollback
 
+- [ ] **Auto-Incrementing Output Filenames** 🆕 USER REQUESTED
+  - Change from timestamp-based (`gen_<task_id>_<timestamp>.png`) 
+    to sequential numbering (`img_001.png`, `img_002.png`, etc.)
+  - Prevents overwriting previous generations
+  - Maintains organized, sortable output history
+  - Implement counter tracking (file/database)
+  - **Priority**: HIGH | **Status**: Planned for Phase 1.1
+
 - [ ] **Export Options**
-  - Multiple format support (PNG, JPG, WEBP, BMP)
-  - Metadata embedding (prompt, seed, parameters)
-  - Batch export with naming conventions
-  - Direct upload to image hosting services
 
 ---
 

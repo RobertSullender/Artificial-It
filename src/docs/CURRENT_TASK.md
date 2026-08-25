@@ -1,8 +1,8 @@
 # 📋 Current Tasks: Active Development Issues
 
 **Project**: Artificial-It  
-**Last Updated**: 2025-08-23  
-**Status**: Active Development - Critical Phase
+**Last Updated**: 2025-08-23 (Evening Session)  
+**Status**: ✅ Foundation Stable - Enhanced with Preview Cleanup & Resolution Fix
 
 ---
 
@@ -146,6 +146,65 @@ src/docs/
 ```
 
 **Next Step**: Create remaining documentation files (`TODO_LIST.md`, `ARCHITECTURE.md`)
+
+---
+
+### 🆕 NEW - User-Requested Feature (Planned)
+
+#### **Feature: Auto-Incrementing Output Filenames** 📸
+**Status**: ⏳ Planned for Phase 1.1 | Priority: HIGH  
+**Requested By**: User during testing session  
+
+**Current Behavior**:
+- Files saved with timestamp format: `gen_<task_id>_<timestamp>.png`
+- Examples: `gen_task1_20250823_143022.png`, `gen_task1_20250823_154511.png`
+
+**Problem**:
+- Same timestamp can overwrite previous files if generated within same second
+- Hard to predict next filename for reference
+- Manual organization required for browsing output history
+
+**Requested Behavior**:
+- Sequential auto-incrementing filenames: `img_001.png`, `img_002.png`, etc.
+- Automatic numbering on each new generation
+- Maintains organized, sortable output folder
+
+**Implementation Requirements**:
+1. **Counter System**: 
+   - Option A: Counter file (`outputs/counter.txt`) with last used number
+   - Option B: Database entry per project/session
+   - Option C: Scan existing files and find highest number
+
+2. **Filename Generation Logic**:
+   ```python
+   # Example implementation approach
+   def get_next_filename(base_name="img"):
+       counter_file = Path("outputs/counter.txt")
+       last_num = 0
+       if counter_file.exists():
+           with open(counter_file) as f:
+               last_num = int(f.read().strip())
+       
+       num = last_num + 1
+       with open(counter_file, 'w') as f:
+           f.write(str(num))
+       
+       return f"{base_name}_{num:03d}.png"  # Zero-padded to 3 digits
+   ```
+
+3. **Integration Points**:
+   - Modify `ExecutionEngine.run_task()` in `src/core/engine.py`
+   - Update final image save section (after line ~130)
+   - Preserve existing functionality, only change filename format
+
+**Estimated Implementation Time**: 2-3 hours  
+**Testing Required**: 
+- Verify counter increments correctly across multiple generations
+- Confirm file doesn't exist before saving (no overwrites)
+- Test reset behavior on app restart or cleanup scenarios
+
+**Dependencies**: None (standalone feature)  
+**Rollback Plan**: Can switch back to timestamp format by reverting one function change
 
 ---
 
