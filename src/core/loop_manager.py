@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 import asyncio
 import threading
 import time

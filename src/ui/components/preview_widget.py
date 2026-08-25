@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt

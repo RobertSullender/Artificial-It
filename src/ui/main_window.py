@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 from PyQt6.QtWidgets import QMainWindow, QTabWidget, QVBoxLayout, QWidget, QLabel
 from core.resource_monitor import ResourceMonitor
 from core.model_manager import ModelManager

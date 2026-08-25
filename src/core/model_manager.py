@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 import os
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field

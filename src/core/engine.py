@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 import asyncio
 from typing import Dict, Any, List
 from PyQt6.QtCore import QObject, pyqtSignal

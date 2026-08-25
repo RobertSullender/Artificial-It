@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
                              QPushButton, QFormLayout, QSpinBox, QComboBox, QApplication)
 from PyQt6.QtCore import QTimer, QDateTime

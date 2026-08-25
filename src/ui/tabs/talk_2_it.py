@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTextEdit, QHBoxLayout, QLineEdit, QPushButton
 from ui.components.preview_widget import PreviewWidget
 import uuid

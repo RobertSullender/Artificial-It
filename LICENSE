@@ -1,0 +1,56 @@
+MIT License
+
+Copyright (c) 2024 Robert Sullender
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+THIRD-PARTY COMPONENTS & MODELS
+
+This software depends on various third-party libraries and AI models as described below.
+
+LGPLv3 Components:
+- PyQt6 (https://www.qt.io/licensing/) - LGPL v3.0
+
+BSD/Permissive Components:
+- PyTorch (BSD-style compatible)
+- Pillow (BSD 3-Clause)
+- NumPy, SciPy (BSD 3-Clause)
+- Matplotlib (BSD-style)
+
+Apache 2.0 Components:
+- Hugging Face Transformers (Apache 2.0)
+- Diffusers Library (Apache 2.0)
+
+AI MODEL DOWNLOADS
+
+This application does NOT include AI models in the source repository. 
+Models are downloaded at runtime from external sources (e.g., Hugging Face).
+
+Each model is subject to its own license terms, which may differ from 
+this software's MIT license. Users downloading or using these models must 
+comply with each model's specific licensing requirements independently.
+
+Example of downloadable models:
+- Stable Diffusion SD1.5: CreativeML Open RAIL-M
+  https://stability.ai/text-to-image-models-license
+
+Users are solely responsible for ensuring their use complies with each 
+model's license terms. This software is distributed under MIT License only.

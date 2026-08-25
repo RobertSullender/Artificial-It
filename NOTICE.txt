@@ -1,0 +1,104 @@
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+
+This application incorporates third-party software components with 
+separate notices and licenses as listed below.
+
+---
+
+PyQt6 (LGPLv3)
+Copyright © 1991-2024 The Qt Company Ltd.
+
+https://www.qt.io/licensing/
+License: LGPL v3.0 - https://www.gnu.org/licenses/lgpl-3.0.html
+
+---
+
+PyTorch / Torch Components
+Copyright © Meta Platforms, Inc. and affiliates.
+https://pytorch.org/license/
+License: BSD-style compatible
+
+---
+
+Hugging Face Transformers
+Copyright © The HuggingFace Team.
+https://github.com/huggingface/transformers/blob/main/LICENSE
+License: Apache 2.0
+
+---
+
+Diffusers Library
+Copyright © The HuggingFace Team.
+https://github.com/huggingface/diffusers/blob/main/LICENSE
+License: Apache 2.0
+
+---
+
+Pillow (PIL)
+Copyright © 1997-2024 by Fredrik Lundh and contributors.
+https://github.com/python-pillow/Pillow/blob/main/LICENSE
+License: BSD 3-Clause
+
+---
+
+NumPy
+Copyright © 2005-2024 NumPy Developers.
+https://numpy.org/doc/stable/reference/links.html#copyright-and-license
+License: BSD 3-Clause
+
+---
+
+SciPy
+Copyright © 2001-2024 SciPy Developers.
+https://scipy.org/licenses.html
+License: BSD 3-Clause
+
+---
+
+Matplotlib
+Copyright © 2002-2024 John D. Hunter and the Matplotlib Development Team.
+https://matplotlib.org/users/license.html
+License: PSD-style
+
+---
+
+nvidia-ml-py
+Copyright © NVIDIA Corporation.
+https://github.com/NVIDIA/Python-APIs/blob/master/nvidia-ml-py/LICENSE
+License: Apache 2.0
+
+---
+
+psutil
+Copyright © 2009-2024 Gabriel Genellina and contributors.
+https://github.com/giampaolo/psutil/blob/master/LICENSE
+License: BSD 3-Clause
+
+---
+
+AI MODEL DOWNLOADS
+
+This application downloads AI models from external sources at runtime.
+These models are not included in this repository and are subject to 
+their own separate licenses, which may differ from this software's MIT license.
+
+Examples of downloadable models and their licenses include:
+
+- Stable Diffusion SD1.5 (Stability AI)
+  License: CreativeML Open RAIL-M
+  Documentation: https://stability.ai/text-to-image-models-license
+  
+- Other models may have different licensing requirements.
+
+Users are responsible for ensuring compliance with all model license terms
+when downloading and using these models. This software's MIT license applies
+only to the application code, not to downloaded models or third-party components.
+
+---
+
+For complete license texts of individual packages, consult their source 
+repositories listed above or run:
+
+    pip show <package-name>
+
+To view license information for installed dependencies.
