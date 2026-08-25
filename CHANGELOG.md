@@ -7,8 +7,7 @@ and this project adheres to [Semantic Versioning]((https://semver.org/spec/v2.0.
 
 ---
 
-## [Unreleased]
-
+## [Unreleased] - v1.1 (Current Development)
 ### Fixed
 - **Critical**: Fixed blocking model loading issue causing application crashes (#1)
   - Wrapped synchronous `model_manager.load_model()` with `asyncio.to_thread()` 
@@ -23,12 +22,29 @@ and this project adheres to [Semantic Versioning]((https://semver.org/spec/v2.0.
   - PyQt6 signals are already thread-safe; manual wrappers unnecessary
   - Eliminates AttributeError and simplifies code
 
+- **High Priority**: Moved preview storage to dedicated temporary directory (#2)
+  - Changed from `outputs/previews/` to `/tmp/artificial_it_temp/previews/`
+  - Temp folder hidden from user-facing outputs/ directory ✅
+  - Preview files auto-deleted after generation completes
+  - Entire temp directory cleanup on app exit ✅
+  - Prevents empty folder confusion in outputs/ (user experience improvement)
+
 ### Enhanced
+- ✅ **Temp Directory Architecture**: Established dedicated temporary storage for future scalability
+  - Location: OS standard temp directory (`/tmp/artificial_it_temp/`)
+  - Auto-creates if missing (handles crashes, manual deletion)
+  - Ready for future subfolders: cache/, downloads/, batch_temp/, debug/
+
 - ✅ Fixed resolution morphing issue: Previews now use correct target dimensions instead of hardcoded 512×512
 - ✅ Implemented automatic cleanup: Intermediate preview files are removed after generation completes
 - Added comprehensive debug logging throughout execution pipeline
 - Created professional documentation system in `src/docs/`
 - Implemented session log tracking for development continuity
+
+### Documentation
+- Added comprehensive implementation documentation in `src/docs/TEMP_DIR_IMPLEMENTATION.md`
+- Created verification guide in `src/docs/TEMP_DIR_VERIFICATION.md`
+- Updated this changelog with detailed version history
 
 ### Planned Features (Under Review)
 - **Auto-incrementing output filenames**: Generate sequential numbered files (img_001.png, img_002.png, etc.) instead of timestamp-based naming
@@ -63,4 +79,5 @@ and this project adheres to [Semantic Versioning]((https://semver.org/spec/v2.0.
 ---
 
 *Changelog v0.1 | Last Updated: 2025-08-23*
+
 

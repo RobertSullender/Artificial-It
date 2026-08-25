@@ -6,6 +6,7 @@ from ui.tabs.imagine_it import ImagineItTab
 from ui.tabs.talk_2_it import Talk2ItTab
 from ui.tabs.structure_it import StructureItTab
 from ui.tabs.train_it import TrainItTab
+import shutil  # ADD: Import for directory removal
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -57,5 +58,14 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, process):
         self.monitor.stop()
+        
+        # ✅ NEW: Delete entire temp directory when app closes (final safety net)
+        if hasattr(self.engine, 'temp_dir') and self.engine.temp_dir.exists():
+            try:
+                shutil.rmtree(str(self.engine.temp_dir))
+                print(f"Cleaned up temporary files: {self.engine.temp_dir}")
+            except Exception as e:
+                print(f"Warning: Could not cleanup temp dir on exit: {e}")
+        
         super().closeEvent(process)
 

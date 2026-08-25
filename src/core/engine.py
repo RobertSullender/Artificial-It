@@ -11,6 +11,7 @@ from pathlib import Path
 from utils.config_manager import settings
 import numpy as np
 from PIL import Image
+import tempfile  # ADD: Import for temporary directory handling
 
 class ExecutionEngine(QObject):
     # Signals to communicate with the UI
@@ -22,8 +23,14 @@ class ExecutionEngine(QObject):
         super().__init__()
         self.model_manager = model_manager
         self.current_tasks: Dict[str, asyncio.Task] = {}
-        # Create a dedicated directory for live previews
-        self.preview_dir = Path("outputs/previews")
+        
+        # ✅ NEW: Create temp directory for all temporary files (previews, cache, etc.)
+        # This moves away from outputs/ to use OS standard temp location
+        self.temp_dir = Path(tempfile.gettempdir()) / "artificial_it_temp"
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # ✅ Preview folder inside temp location (not visible in user's outputs/)
+        self.preview_dir = self.temp_dir / "previews"
         self.preview_dir.mkdir(parents=True, exist_ok=True)
 
 
