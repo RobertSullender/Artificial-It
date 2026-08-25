@@ -40,9 +40,8 @@ and this project adheres to [Semantic Versioning]((https://semver.org/spec/v2.0.
 - Sampler parameter not affecting generation output (Diffusers v0.31+ architectural limitation)
   - Documented as known issue, disabled for future enhancement
   
-- Progress percentage updates working but visual bar still at 0% (incomplete fix)
+- Progress percentage updates confirmed working by user testing (0% → 100%)
   - Status text updates correctly (5% → 10% → ... → 100%)
-  - Visual progress bar widget needs additional configuration
 
 ---
 
