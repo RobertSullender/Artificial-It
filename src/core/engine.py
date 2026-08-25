@@ -26,6 +26,7 @@ class ExecutionEngine(QObject):
         self.preview_dir = Path("outputs/previews")
         self.preview_dir.mkdir(parents=True, exist_ok=True)
 
+
     async def run_task(self, task_id: str, params: Dict[str, Any]):
         """
         The main entry point for any AI generation request.
@@ -71,11 +72,13 @@ class ExecutionEngine(QObject):
                     generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu").manual_seed(int(seed))
 
                 # Define a callback to capture intermediate previews
-                def callback_on_step_end(pipe, step, timestep, callback_kwargs):
-                    latents = callback_kwargs.get("latents")
+                # NOTE: Diffusers v0.31+ uses signature: callback(step_idx, t, latents)
+                def callback_on_step_end(step_idx, t, latents):
+                    print(f'DEBUG Callback called: step={step_idx}')  # DEBUG
+                    
                     if latents is not None:
                         with torch.no_grad():
-                            decoded = pipe.vae.decode(latents / pipe.vae.config.scaling_factor, return_dict=False)[0]
+                            decoded = model_obj.vae.decode(latents / model_obj.vae.config.scaling_factor, return_dict=False)[0]
                             image = decoded.cpu().numpy()
 
                             if image.ndim == 4:
@@ -89,7 +92,7 @@ class ExecutionEngine(QObject):
                             image = (image * 255).astype(np.uint8)
                             preview_img = Image.fromarray(image).resize((512, 512), Image.Resampling.LANCZOS)
 
-                            preview_path = self.preview_dir / f"prev_{task_id}_{step:03d}.png"
+                            preview_path = self.preview_dir / f"prev_{task_id}_{step_idx:03d}.png"
                             preview_img.save(str(preview_path))
 
                             # Minimal sleep to ensure disk I/O is complete before signaling the UI
@@ -97,13 +100,17 @@ class ExecutionEngine(QObject):
 
                             self.progress_updated.emit({
                                 "task_id": task_id, 
-                                "status": f"Step {step}/{num_inference_steps}",
-                                "image_path": str(preview_path)
+                                "status": f"Step {step_idx}/{num_inference_steps}",
+                                "image_path": str(preview_path),
+                                "percentage": (step_idx / num_inference_steps) * 100
                             })
-                    return callback_kwargs
 
                 def perform_inference():
                     with torch.no_grad():
+                        # NOTE: Samplers in Diffusers v0.31+ are determined at pipeline creation time,
+                        # not per-call. The sampler parameter is stored for future use or model-specific overrides.
+                        print(f'DEBUG Sampler selected: {sampler}')
+
                         # Pass the professional parameters into the pipeline call
                         output = model_obj(
                             prompt=prompt,
@@ -113,6 +120,8 @@ class ExecutionEngine(QObject):
                             width=width,
                             height=height,
                             generator=generator,
+                            callback=callback_on_step_end,
+                            callback_steps=1,  # Trigger callback after every step
                         )
                         return output.images[0]
                 

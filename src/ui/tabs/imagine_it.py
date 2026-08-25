@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
-                             QPushButton, QFormLayout, QSpinBox, QComboBox)
+                             QPushButton, QFormLayout, QSpinBox, QComboBox, QApplication)
 from PyQt6.QtCore import QTimer, QDateTime
 from ui.components.preview_widget import PreviewWidget
 from utils.token_counter import TokenCounter
@@ -220,6 +220,9 @@ class ImagineItTab(QWidget):
     def on_progress_updated(self, data):
         """Updates the live preview labels and checks if image is ready."""
         try:
+            # DEBUG: Print raw data received from engine
+            print(f'DEBUG Progress data: {data}')
+            
             # 1. Update live preview with new status
             self._update_live_preview(data)
             
@@ -232,7 +235,13 @@ class ImagineItTab(QWidget):
             print(f"Error in on_progress_updated: {e}")
 
     def _update_live_preview(self, data):
-        """Thread-safe method to update live preview labels."""
+        """Schedule UI update on main thread."""
+        # PyQt6 signals are already thread-safe, no special wrapper needed
+        # Simply call the method directly - Qt handles threading automatically
+        self._do_update_live_preview(data)
+
+    def _do_update_live_preview(self, data):
+        """Actual update logic - runs on main thread."""
         status = data.get('status', '')
         
         if 'Step' in status and '/' in status:
