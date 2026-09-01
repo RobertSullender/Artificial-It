@@ -3,81 +3,65 @@
 All notable changes to the Artificial-It project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning]((https://semver.org/spec/v2.0.0.html).
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased] - v1.1 (Current Development)
-### Fixed
-- **Critical**: Fixed blocking model loading issue causing application crashes (#1)
-  - Wrapped synchronous `model_manager.load_model()` with `asyncio.to_thread()` 
-  - Prevents event loop freezing during model initialization
-  
-- **High Priority**: Updated callback signature for Diffusers v0.31+ compatibility
-  - Changed from old API `(pipe, step, timestep, callback_kwargs)` to new format `(step_idx, t, latents)`
-  - Fixed variable reference: `pipe.vae` → `model_obj.vae`
-  - Enables progress bar updates during image generation
-  
-- **High Priority**: Removed invalid `QApplication.invokeLater()` wrapper in PyQt6
-  - PyQt6 signals are already thread-safe; manual wrappers unnecessary
-  - Eliminates AttributeError and simplifies code
+## [Unreleased] - v1.1 (Future Development)
+---
 
-- **High Priority**: Moved preview storage to dedicated temporary directory (#2)
-  - Changed from `outputs/previews/` to `/tmp/artificial_it_temp/previews/`
-  - Temp folder hidden from user-facing outputs/ directory ✅
-  - Preview files auto-deleted after generation completes
-  - Entire temp directory cleanup on app exit ✅
-  - Prevents empty folder confusion in outputs/ (user experience improvement)
+## [v0.33] - 2025-08-25 (Alpha Preview - Pre-Release)
+### Status
+> ⚠️ **PRE-RELEASE ALPHA**: This is version 0.33 in active development. Only Imagine mode with SD1.5 is fully functional. Talk-2-It, Structure-It, and Train-It features are marked "Coming Soon" as placeholders for future releases.
+### Fixed
+- **Pre-Release Quality**: Refined placeholder tabs to remove all misleading functionality
+  - `talk_2_it.py`: Removed dummy chat code, added clear "Not_Implemented: Coming Soon!" message
+  - `structure_it.py`: Removed misleading ControlNet references, replaced with honest placeholder
+  - `train_it.py`: Removed training UI elements that didn't work
+  - All tabs now consistently display identical "Coming Soon" messaging in both UI and console
 
 ### Enhanced
-- ✅ **Temp Directory Architecture**: Established dedicated temporary storage for future scalability
-  - Location: OS standard temp directory (`/tmp/artificial_it_temp/`)
-  - Auto-creates if missing (handles crashes, manual deletion)
-  - Ready for future subfolders: cache/, downloads/, batch_temp/, debug/
-
-- ✅ Fixed resolution morphing issue: Previews now use correct target dimensions instead of hardcoded 512×512
-- ✅ Implemented automatic cleanup: Intermediate preview files are removed after generation completes
-- Added comprehensive debug logging throughout execution pipeline
-- Created professional documentation system in `src/docs/`
-- Implemented session log tracking for development continuity
-
-### Documentation
-- Added comprehensive implementation documentation in `src/docs/TEMP_DIR_IMPLEMENTATION.md`
-- Created verification guide in `src/docs/TEMP_DIR_VERIFICATION.md`
-- Updated this changelog with detailed version history
-
-### Planned Features (Under Review)
-- **Auto-incrementing output filenames**: Generate sequential numbered files (img_001.png, img_002.png, etc.) instead of timestamp-based naming
-  - Prevents overwriting previous generations with same filename
-  - Maintains organized, sortable output history
-  - Priority: High (user requested feature)
-
-### Known Issues
-- Sampler parameter not affecting generation output (Diffusers v0.31+ architectural limitation)
-  - Documented as known issue, disabled for future enhancement
-  
-- Progress percentage updates confirmed working by user testing (0% → 100%)
-  - Status text updates correctly (5% → 10% → ... → 100%)
-
+- **Documentation Accuracy**: Updated README.md to reflect true development status
+  - Header changed from "Production Ready" to "Alpha Preview - Under Active Development (v0.33)"
+  - Added features section distinguishing stable vs under-development capabilities
+  - Known limitations updated with version-specific context
 ---
 
-## [0.1.0] - 2025-08-23
+## [v0.1.0] - 2025-08-23 (Initial Release)
 
 ### Added
 - Initial project structure with PyQt6 main window
 - Imagine mode UI with prompt input, model selection, and controls
-- Model management system with async loading support
+- Model management system with async loading support (`asyncio.to_thread()`)
 - Live preview widget integration
+- Temp directory architecture for previews (`/tmp/artificial_it_temp/previews/`)
 - Git repository initialization
-- Professional documentation framework (PROJECT_SUMMARY.md, TODO_LIST.md, CURRENT_TASK.md)
+- Professional documentation framework in `src/docs/`
+  - ARCHITECTURE.md - Technical design patterns
+  - PROJECT_SUMMARY.md - Mission and goals
+  - CURRENT_TASK.md - Active development issues
+  - DEVELOPMENT_LOG.md - Session tracking
 
 ### Fixed
-- Removed dead thread code from Imagine-It tab
-- Added missing PreviewWidget initialization
+- **Critical**: Removed dead thread code from Imagine-It tab (blocking UI issue)
+- Added missing PreviewWidget initialization in tabs
 - Created proper signal-slot connections for progress handling
+- Updated callback signature for Diffusers v0.31+ compatibility:
+  - Changed from old `(pipe, step, timestep, callback_kwargs)` format
+  - New format: `(step_idx, t, latents)` with `model_obj.vae` reference
+- Fixed resolution morphing issue (previews now use correct target dimensions)
+- Implemented automatic cleanup of intermediate preview files
+
+### Known Issues (v0.1.0)
+- **Sampler Parameter**: Not affecting generation output (Diffusers v0.31+ architectural limitation - sampler set at pipeline creation time)
+- **Model Support**: Only SD1.5 implemented; SDXL/SD3.5 planned for future releases
+- **Placeholder Features**: Talk-2-It, Structure-It, Train-It tabs are placeholders only
 
 ---
 
-*Changelog v0.1 | Last Updated: 2025-08-23*
+## [0.0.1] - 2025-08-22 (Pre-Initial)
 
+### Added
+- Project initialization structure
+- Basic Git repository setup
 

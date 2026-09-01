@@ -9,7 +9,9 @@
 [![PyQt6](https://img.shields.io/badge/PyQt6-6.5%2B-orange.svg)](https://www.riverbankcomputing.com/software/pyqt/)
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-supported-yellow.svg)](https://huggingface.co)
 
-**Generate stunning AI images from text prompts with an intuitive desktop application.**
+**Alpha Preview - Under Active Development (v0.33)**
+
+Generate stunning AI images from text prompts with an intuitive desktop application.
 
 </div>
 
@@ -17,13 +19,16 @@
 
 ## 🌟 Features
 
-- **🚀 Lightning-Fast Generation**: Powered by Stable Diffusion and PyTorch
-- **🎯 Live Preview**: Real-time image preview during generation process
-- **⚡ Non-Blocking UI**: Async operations keep your interface responsive
-- **🖼️ Multiple Model Support**: Works with various diffusion models (SD1.5, SDXL, etc.)
-- **🎨 Professional Controls**: Fine-tune parameters like guidance scale, steps, resolution
+### ✅ Stable Features
+- **🎨 Imagine Mode**: Text-to-image generation with Stable Diffusion v1.5
+- **⚡ Async Architecture**: Non-blocking UI during long operations  
+- **🖼️ Live Preview**: Real-time image preview during generation process
+- **🔧 Professional Controls**: Fine-tune parameters like guidance scale, steps, resolution
 - **💾 Efficient Storage**: Smart temp directory management for large files
-- **🔒 Privacy-Focused**: All processing happens locally on your machine
+- **📊 Progress Tracking**: Visual progress indicators during generation
+
+### 🚧 Under Development
+> ⚠️ **Note:** This is a pre-release (v0.33). Talk-2-It, Structure-It, and Train-It features are currently marked "Coming Soon" as placeholders for future development. Full LLM integration and advanced features (SDXL, SD3.5, ControlNet, batch processing, model training) are planned but not yet available.
 
 ---
 
@@ -125,6 +130,11 @@ For complete information, see the [`LICENSE`](./LICENSE) file for model download
 ---
 
 ## 🧪 Known Limitations
+
+### Current Version Status (v0.33)
+- **Status**: Pre-release, Alpha stage
+- **Working Features**: Imagine mode with SD1.5 only; other tabs are placeholders
+- **Model Support**: Limited to Stable Diffusion v1.5; SDXL/SD3.5 support planned for future releases
 
 ### Sampler Parameter (Current Version)
 - **Status**: Documented limitation
