@@ -38,6 +38,7 @@ htmlcov/
 *.swp
 *.swo
 *~
+Artificial-It.code-workspace
 
 # OS-specific files
 .DS_Store
