@@ -1,9 +1,12 @@
-# Artificial-It 
+# Artificial-It
+
+![Alt Text](Screenshot.png)
+```
 
 ## Project Description
- - AI image generator using v1-5-pruned.safetensors.
- - PyQt6 Desktop Application(currently launches from the terminal).
- - This project is in the early stages of development and should be considered a pre-release.
+Artificial-It is a desktop application for generating images, chat, dataset preparation, and Model/LoRA training. This project is in an early-stage of active-development and should be considered a pre-release(beta). Most features have not been implemented yet. Current state is very minimal as of September, 2nd, 2026.   
+
+## License MIT
  
 ## Features
  - Live Preview
