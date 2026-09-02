@@ -1,7 +1,6 @@
 # Artificial-It
 
 ![Alt Text](Screenshot.png)
-```
 
 ## Project Description
 Artificial-It is a desktop application for generating images, chat, dataset preparation, and Model/LoRA training. This project is in an early-stage of active-development and should be considered a pre-release(beta). Most features have not been implemented yet. Current state is very minimal as of September, 2nd, 2026.   
