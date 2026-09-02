@@ -63,7 +63,21 @@ python src/main.py
 
 ## Notes
  - Closing the terminal, used to start the application, will kill the application.
+ - Do not install requirements(**Step (5)**) into the system python make sure you are inside your active venv(**Step (4)**).
  - Use deactivate to kill the python virtual environment.
 ```bash
 deactivate
 ```
+
+## Restarting
+ - If you would like to start the application again, simply open a terminal and follow these commands.
+```bash
+cd Artificial-It
+```
+```bash
+source .venv/bin/activate
+```
+```bash
+python src/main.py
+```
+
