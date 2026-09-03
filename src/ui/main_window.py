@@ -16,6 +16,8 @@ from ui.tabs.talk_2_it import Talk2ItTab
 from ui.tabs.structure_it import StructureItTab
 from ui.tabs.train_it import TrainItTab
 import shutil  # ADD: Import for directory removal
+import sys
+from pathlib import Path
 
 class MainWindow(QMainWindow):
 

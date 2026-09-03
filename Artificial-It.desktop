@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Artificial-It
+Comment=AI image generation and training tools
+Exec=/home/ubuntu/Artificial-It/.venv/bin/python /home/ubuntu/Artificial-It/src/main.py
+Path=/home/ubuntu/Artificial-It
+Icon=/home/ubuntu/Artificial-It/icons/1024x1024.png
+Terminal=false
+Categories=Graphics;
+StartupNotify=true
+StartupWMClass=Artificial-It

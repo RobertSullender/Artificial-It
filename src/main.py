@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: MIT
 import sys
+from pathlib import Path
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 from ui.main_window import MainWindow
 from core.loop_manager import instance as loop_manager
@@ -8,6 +10,9 @@ from ui.theme_manager import ThemeManager
 
 def main():
     app = QApplication(sys.argv)
+    app.setDesktopFileName("Artificial-It")
+    icon_path = Path(__file__).resolve().parent.parent / "icons" / "1024x1024.png"
+    app.setWindowIcon(QIcon(str(icon_path)))
     theme_manager = ThemeManager(app)
     theme_manager.apply_theme("Dark")
     

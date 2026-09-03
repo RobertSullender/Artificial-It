@@ -1,4 +1,4 @@
-# Artificial-It
+# Artificial-It ![Alt Text](Artificial-It-Logo.png)
 
 ![Alt Text](Screenshot.png)
 
@@ -56,6 +56,14 @@ pip install -r requirements.txt
 ```bash
 python src/main.py
 ```
+
+ - **Optional**: Add Artificial-It to the Ubuntu application menu.
+```bash
+mkdir -p ~/.local/share/applications
+cp artificial-it.desktop ~/.local/share/applications/
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+```
+     - The included launcher uses this checkout's absolute path and virtual environment. If the repository is moved, update `artificial-it.desktop` before copying it again.
 
  - **Step (7)**: Download the model.
     - https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/blob/main/v1-5-pruned.safetensors
