@@ -1,5 +1,13 @@
 # SPDX-License-Identifier: MIT
-from PyQt6.QtWidgets import QMainWindow, QTabWidget, QVBoxLayout, QWidget, QLabel
+from PyQt6.QtWidgets import (
+    QLabel,
+    QMainWindow,
+    QMenu,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
+from PyQt6.QtGui import QAction, QActionGroup
 from core.resource_monitor import ResourceMonitor
 from core.model_manager import ModelManager
 from core.engine import ExecutionEngine
@@ -10,8 +18,10 @@ from ui.tabs.train_it import TrainItTab
 import shutil  # ADD: Import for directory removal
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+
+    def __init__(self, theme_manager):
         super().__init__()
+        self.theme_manager = theme_manager
         self.setWindowTitle("Artificial-It")
         self.resize(1280, 720)
 
@@ -45,6 +55,49 @@ class MainWindow(QMainWindow):
         self.status_bar = self.statusBar()
         self.stats_label = QLabel("Initializing resources...")
         self.status_bar.addWidget(self.stats_label)
+
+        self.create_menu()
+
+    def create_menu(self):
+        menu_bar = self.menuBar()
+
+        view_menu = menu_bar.addMenu("View")
+
+        theme_menu = QMenu("Theme", self)
+        view_menu.addMenu(theme_menu)
+
+        theme_group = QActionGroup(self)
+        theme_group.setExclusive(True)
+
+        for theme_name in self.theme_manager.THEMES:
+            action = QAction(theme_name, self)
+            action.setCheckable(True)
+            action.setData(theme_name)
+
+            if theme_name == self.theme_manager.current_theme:
+                action.setChecked(True)
+
+            action.triggered.connect(
+                lambda checked, name=theme_name:
+                    self.change_theme(name)
+            )
+
+            theme_group.addAction(action)
+            theme_menu.addAction(action)
+
+        theme_menu.addSeparator()
+
+        theme_settings_action = QAction("Theme settings...", self)
+        theme_settings_action.triggered.connect(
+            self.open_theme_settings
+        )
+        theme_menu.addAction(theme_settings_action)
+
+    def change_theme(self, theme_name):
+        self.theme_manager.apply_theme(theme_name)
+
+    def open_theme_settings(self):
+        print("Theme settings selected")
 
     def update_resource_stats(self, stats):
         cpu = stats.get('cpu_percent', 0)

@@ -36,6 +36,9 @@ class ImagineItTab(QWidget):
             border-radius: 6px;
             font-size: 14px;
             border-left: 4px solid #00ff88;
+            border-right: 4px solid #00ff88;
+            border-top: 4px solid #00ff88;
+            border-bottom: 4px solid #00ff88;
             min-height: 60px;
         """)
 
