@@ -52,20 +52,20 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
- - **Step (6)**: Start the program.
+ - **Step (6)**: Add Artificial-It to the Ubuntu application menu.
+```bash
+mkdir -p ~/.local/share/applications
+cp Artificial-It.desktop ~/.local/share/applications/
+update-desktop-database ~/.local/share/applications 2>/dev/null || true
+```
+   - The included launcher uses this checkout's absolute path and virtual environment. If the repository is moved, update `Artificial-It.desktop` before copying it again.
+
+ - **Step (7)**: Start the program.
 ```bash
 python src/main.py
 ```
 
- - **Optional**: Add Artificial-It to the Ubuntu application menu.
-```bash
-mkdir -p ~/.local/share/applications
-cp artificial-it.desktop ~/.local/share/applications/
-update-desktop-database ~/.local/share/applications 2>/dev/null || true
-```
-     - The included launcher uses this checkout's absolute path and virtual environment. If the repository is moved, update `artificial-it.desktop` before copying it again.
-
- - **Step (7)**: Download the model.
+ - **Step (8)**: Download the model.
     - https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/blob/main/v1-5-pruned.safetensors
     - Place the v1-5-pruned.safetensors file in the auto-generated models folder.
 
