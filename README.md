@@ -1,4 +1,4 @@
-# Artificial-It ![Alt Text](icons/64x64.png)
+# Artificial-It ![Alt Text](icons/32x32.png)
 
 ![Alt Text](Screenshot.png)
 

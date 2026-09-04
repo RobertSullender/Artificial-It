@@ -35,20 +35,27 @@ class ImagineItTab(QWidget):
             padding: 15px;
             border-radius: 6px;
             font-size: 14px;
+            font-weight: bold;
             border-left: 4px solid #00ff88;
             border-right: 4px solid #00ff88;
             border-top: 4px solid #00ff88;
             border-bottom: 4px solid #00ff88;
-            min-height: 60px;
+            min-height: 20px;
         """)
 
         self.live_progress_label = QLabel("0%")
         self.live_progress_label.setStyleSheet("""
-            background-color: #2b2b2b;
-            color: #888;
-            padding: 10px 15px;
-            border-radius: 4px;
+            background-color: #1a1a1a;
+            color: #00ff88;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 14px;
             font-weight: bold;
+            border-left: 4px solid #00ff88;
+            border-right: 4px solid #00ff88;
+            border-top: 4px solid #00ff88;
+            border-bottom: 4px solid #00ff88;
+            min-height: 20px;
         """)
 
         preview_layout = QHBoxLayout()
