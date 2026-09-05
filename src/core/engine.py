@@ -85,7 +85,15 @@ class ExecutionEngine(QObject):
             
             # FIX: Run the synchronous load_model call in a separate thread to avoid blocking the event loop.
             # This prevents the UI from freezing and avoids race conditions during initialization.
-            model_obj = await asyncio.to_thread(self.model_manager.load_model, model_name)
+            precision = params.get(
+                "precision",
+                settings.get("hardware.precision", "fp16"),
+            )
+            model_obj = await asyncio.to_thread(
+                self.model_manager.load_model,
+                model_name,
+                precision,
+            )
             
             if not model_obj:
                 raise RuntimeError(f"Failed to load model: {model_name}")
@@ -140,7 +148,7 @@ class ExecutionEngine(QObject):
                     latents = callback_kwargs.get("latents")
                     clean_latents = preview_latents["value"]
                     preview_path = None
-                    if latents is not None:
+                    if latents is not None and settings.get("ui.live_preview", True):
                         with torch.no_grad():
                             preview_latent = clean_latents if clean_latents is not None else latents
                             has_latents_mean = getattr(model_obj.vae.config, "latents_mean", None) is not None

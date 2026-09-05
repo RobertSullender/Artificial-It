@@ -2,12 +2,12 @@
 from PyQt6.QtWidgets import (
     QLabel,
     QMainWindow,
-    QMenu,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
-from PyQt6.QtGui import QAction, QActionGroup
+from PyQt6.QtCore import Qt
 from core.resource_monitor import ResourceMonitor
 from core.model_manager import ModelManager
 from core.engine import ExecutionEngine
@@ -15,6 +15,8 @@ from ui.tabs.imagine_it import ImagineItTab
 from ui.tabs.talk_2_it import Talk2ItTab
 from ui.tabs.structure_it import StructureItTab
 from ui.tabs.train_it import TrainItTab
+from ui.settings_dialog import SettingsDialog
+from utils.config_manager import settings
 import shutil
 
 class MainWindow(QMainWindow):
@@ -29,9 +31,8 @@ class MainWindow(QMainWindow):
         self.model_manager = ModelManager()
         self.engine = ExecutionEngine(self.model_manager)
         # Initialize Resource Monitor
-        self.monitor = ResourceMonitor()
-        self.monitor.stats_updated.connect(self.update_resource_stats)
-        self.monitor.start()
+        self.monitor = None
+        self.start_resource_monitor()
 
         # Central Widget and Layout
         central_widget = QWidget()
@@ -45,61 +46,64 @@ class MainWindow(QMainWindow):
         self.tabs.setMovable(True)
 
         # Initialize Tabs with injected engines/managers
-        self.tabs.addTab(ImagineItTab(self.engine), "Imagine-It")
+        self.imagine_tab = ImagineItTab(self.engine)
+        self.tabs.addTab(self.imagine_tab, "Imagine-It")
         self.tabs.addTab(Talk2ItTab(self.engine), "Talk-2-It")
         self.tabs.addTab(StructureItTab(self.engine), "Structure-It")
         self.tabs.addTab(TrainItTab(self.engine), "Train-It")
 
-        layout.addWidget(self.tabs)
+        tabs_row = QWidget()
+        tabs_layout = QVBoxLayout(tabs_row)
+        tabs_layout.setContentsMargins(0, 0, 0, 0)
+        tabs_layout.addWidget(self.tabs)
+
+        self.settings_button = QToolButton()
+        self.settings_button.setText("⚙")
+        self.settings_button.setToolTip("Settings")
+        self.settings_button.setAccessibleName("Settings")
+        self.settings_button.setFixedSize(36, 28)
+        self.settings_button.setStyleSheet(
+            "QToolButton { padding-bottom: 5px; padding-right: 13px; }"
+        )
+
+        self.settings_button.clicked.connect(self.open_settings)
+        self.tabs.setCornerWidget(self.settings_button, Qt.Corner.TopRightCorner)
+
+        layout.addWidget(tabs_row)
         # Status Bar for Resource Monitor
         self.status_bar = self.statusBar()
         self.stats_label = QLabel("Initializing resources...")
         self.status_bar.addWidget(self.stats_label)
 
-        self.create_menu()
+    def start_resource_monitor(self):
+        if self.monitor is None:
+            self.monitor = ResourceMonitor()
+            self.monitor.stats_updated.connect(self.update_resource_stats)
+        self.monitor.start()
 
-    def create_menu(self):
-        menu_bar = self.menuBar()
-
-        view_menu = menu_bar.addMenu("View")
-
-        theme_menu = QMenu("Theme", self)
-        view_menu.addMenu(theme_menu)
-
-        theme_group = QActionGroup(self)
-        theme_group.setExclusive(True)
-
-        for theme_name in self.theme_manager.THEMES:
-            action = QAction(theme_name, self)
-            action.setCheckable(True)
-            action.setData(theme_name)
-
-            if theme_name == self.theme_manager.current_theme:
-                action.setChecked(True)
-
-            action.triggered.connect(
-                lambda checked, name=theme_name:
-                    self.change_theme(name)
+    def open_settings(self):
+        dialog = SettingsDialog(self.theme_manager, self)
+        if dialog.exec():
+            self.apply_resource_setting()
+            self.imagine_tab.set_live_preview_enabled(
+                dialog.preview_input.isChecked()
             )
 
-            theme_group.addAction(action)
-            theme_menu.addAction(action)
-
-        theme_menu.addSeparator()
-
-        theme_settings_action = QAction("Theme settings...", self)
-        theme_settings_action.triggered.connect(
-            self.open_theme_settings
-        )
-        theme_menu.addAction(theme_settings_action)
-
-    def change_theme(self, theme_name):
-        self.theme_manager.apply_theme(theme_name)
-
-    def open_theme_settings(self):
-        print("Theme settings selected")
+    def apply_resource_setting(self):
+        enabled = settings.get("ui.resource_monitor", True)
+        if enabled:
+            if self.monitor is None or not self.monitor.isRunning():
+                self.monitor = ResourceMonitor()
+                self.monitor.stats_updated.connect(self.update_resource_stats)
+                self.monitor.start()
+        elif self.monitor is not None:
+            self.monitor.stop()
+            self.stats_label.setText("Resources Off")
 
     def update_resource_stats(self, stats):
+        if not settings.get("ui.resource_monitor", True):
+            self.stats_label.setText("Resources Off")
+            return
         cpu = stats.get('cpu_percent', 0)
         ram = stats.get('ram_percent', 0)
         gpu_p = stats.get('gpu_percent', 0)
@@ -111,7 +115,8 @@ class MainWindow(QMainWindow):
         )
 
     def closeEvent(self, process):
-        self.monitor.stop()
+        if self.monitor is not None:
+            self.monitor.stop()
         
         # ✅ NEW: Delete entire temp directory when app closes (final safety net)
         if hasattr(self.engine, 'temp_dir') and self.engine.temp_dir.exists():

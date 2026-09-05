@@ -23,7 +23,12 @@ class ConfigManager:
         },
         "hardware": {
             "use_cuda": True,
-            "precision": "fp16"
+            "precision": "fp16",
+            "available_precisions": ["fp8", "fp16", "bf16", "fp32"]
+        },
+        "ui": {
+            "live_preview": True,
+            "resource_monitor": True
         }
     }
 
@@ -42,6 +47,14 @@ class ConfigManager:
             return val
         except (KeyError, TypeError):
             return default
+
+    def set(self, key: str, value: Any) -> None:
+        """Set a configuration value using dot notation."""
+        keys = key.split('.')
+        target = self.config
+        for part in keys[:-1]:
+            target = target.setdefault(part, {})
+        target[keys[-1]] = value
 
 # Singleton instance for global access
 settings = ConfigManager()

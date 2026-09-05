@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import torch
 
 from diffusers import (
     DDIMScheduler,
@@ -72,6 +73,42 @@ class ModelSupportTests(unittest.TestCase):
         error = RuntimeError("CUDA out of memory\nallocation details")
         self.assertEqual(ExecutionEngine.format_error(error), "Out of memory")
 
+    def test_precision_resolution(self):
+        self.assertEqual(self.manager.normalize_precision("float16"), "fp16")
+        self.assertIs(self.manager.resolve_dtype("fp16"), torch.float16)
+        self.assertIs(self.manager.resolve_dtype("bf16"), torch.bfloat16)
+        self.assertIs(self.manager.resolve_dtype("fp32"), torch.float32)
+
+    def test_fp8_is_rejected_until_supported(self):
+        with self.assertRaisesRegex(ValueError, "FP8"):
+            self.manager.resolve_dtype("fp8")
+
+    def test_resource_guard_rejects_insufficient_system_memory(self):
+        meta = self.manager.models["sd_xl_base_1.0.safetensors"]
+        memory = type("Memory", (), {"available": 1 * 1024 ** 3})()
+        with patch("core.model_manager.psutil.virtual_memory", return_value=memory), patch(
+            "core.model_manager.torch.cuda.is_available", return_value=False
+        ), self.assertRaisesRegex(RuntimeError, "Not enough system memory"):
+            self.manager._check_load_resources(meta, "fp16")
+
+    def test_same_model_different_precision_does_not_reuse(self):
+        class FakePipeline:
+            def to(self, device):
+                return self
+
+        first = FakePipeline()
+        second = FakePipeline()
+        self.manager._loaded_objects["v1-5-pruned.safetensors"] = first
+        self.manager._active_model_name = "v1-5-pruned.safetensors"
+        self.manager._active_precision = "fp16"
+        with patch.object(self.manager, "_load_checkpoint", return_value=second), patch(
+            "core.model_manager.torch.cuda.is_available", return_value=False
+        ):
+            loaded = self.manager.load_model("v1-5-pruned.safetensors", "fp32")
+        self.assertIs(loaded, second)
+        self.assertIsNot(loaded, first)
+        self.assertEqual(self.manager._active_precision, "fp32")
+
     def test_sampler_selection_creates_requested_scheduler(self):
         from diffusers import EulerDiscreteScheduler
 
@@ -96,6 +133,7 @@ class ModelSupportTests(unittest.TestCase):
         loaded = object()
         self.manager._loaded_objects["v1-5-pruned.safetensors"] = loaded
         self.manager._active_model_name = "v1-5-pruned.safetensors"
+        self.manager._active_precision = "fp16"
         with patch.object(self.manager, "_load_checkpoint") as load_checkpoint:
             self.assertIs(
                 self.manager.load_model("v1-5-pruned.safetensors"),

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 import os
 import gc
+import psutil
 from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
@@ -29,6 +30,7 @@ class ModelManager:
         self.models: Dict[str, ModelMetadata] = {}
         self._loaded_objects: Dict[str, object] = {}
         self._active_model_name: Optional[str] = None
+        self._active_precision: Optional[str] = None
         
         # Get base path from config manager
         self.base_path = os.path.abspath(settings.get('paths.models_dir'))
@@ -148,16 +150,20 @@ class ModelManager:
             return [m for m in self.models.values() if m.type == model_type]
         return list(self.models.values())
 
-    def load_model(self, name: str) -> Optional[object]:
+    def load_model(self, name: str, precision: Optional[str] = None) -> Optional[object]:
         """Lazy-load a model into memory/GPU."""
         if name not in self.models:
             print(f"Error: Model {name} is not registered.")
             return None
         
-        if name in self._loaded_objects:
+        requested_precision = self.normalize_precision(
+            precision or settings.get("hardware.precision", "fp16")
+        )
+
+        if name in self._loaded_objects and self._active_precision == requested_precision:
             return self._loaded_objects[name]
 
-        if self._active_model_name and self._active_model_name != name:
+        if self._active_model_name:
             self.unload_model(self._active_model_name)
 
         meta = self.models[name]
@@ -165,7 +171,8 @@ class ModelManager:
         
         if meta.type == 'checkpoint' and meta.path.endswith('.safetensors'):
             try:
-                model = self._load_checkpoint(meta)
+                self._check_load_resources(meta, requested_precision)
+                model = self._load_checkpoint(meta, requested_precision)
                 if torch.cuda.is_available():
                     model.to("cuda")
                 else:
@@ -173,11 +180,13 @@ class ModelManager:
                 
                 self._loaded_objects[name] = model
                 self._active_model_name = name
+                self._active_precision = requested_precision
                 return model
             except Exception as e:
                 print(f"Failed to load {meta.family} model '{name}': {e}")
                 self._loaded_objects.pop(name, None)
                 self._active_model_name = None
+                self._active_precision = None
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                 return None
@@ -186,16 +195,62 @@ class ModelManager:
         loaded_obj = f"LoadedObject({meta.name})"
         self._loaded_objects[name] = loaded_obj
         self._active_model_name = name
+        self._active_precision = requested_precision
         return loaded_obj
 
-    def _load_checkpoint(self, meta: ModelMetadata):
+    @staticmethod
+    def normalize_precision(precision: str) -> str:
+        normalized = str(precision).strip().lower()
+        aliases = {"float16": "fp16", "float32": "fp32", "bfloat16": "bf16"}
+        normalized = aliases.get(normalized, normalized)
+        if normalized not in {"fp8", "fp16", "bf16", "fp32"}:
+            raise ValueError(f"Unsupported precision: {precision}")
+        return normalized
+
+    @staticmethod
+    def resolve_dtype(precision: str):
+        precision = ModelManager.normalize_precision(precision)
+        if precision == "fp8":
+            raise ValueError("FP8 is not supported for standard Diffusers pipeline inference")
+        return {
+            "fp16": torch.float16,
+            "bf16": torch.bfloat16,
+            "fp32": torch.float32,
+        }[precision]
+
+    def _load_checkpoint(self, meta: ModelMetadata, precision: str):
         pipeline_class = self.get_pipeline_class(meta)
         return pipeline_class.from_single_file(
             meta.path,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            torch_dtype=self.resolve_dtype(precision),
             use_safetensors=True,
             local_files_only=True
         )
+
+    @staticmethod
+    def _check_load_resources(meta: ModelMetadata, precision: str) -> None:
+        """Reject high-risk native loads before Torch can fail outside Python."""
+        checkpoint_size_gb = os.path.getsize(meta.path) / (1024 ** 3)
+        available_ram_gb = psutil.virtual_memory().available / (1024 ** 3)
+        required_ram_gb = max(4.0, checkpoint_size_gb * 1.15)
+        if available_ram_gb < required_ram_gb:
+            raise RuntimeError(
+                f"Not enough system memory to load {meta.name} "
+                f"({available_ram_gb:.1f} GB available, {required_ram_gb:.1f} GB required)"
+            )
+
+        if torch.cuda.is_available():
+            free_bytes, _ = torch.cuda.mem_get_info()
+            available_gpu_gb = free_bytes / (1024 ** 3)
+            if meta.family == "sdxl":
+                required_gpu_gb = 14.0 if precision == "fp32" else 8.0
+            else:
+                required_gpu_gb = 7.0 if precision == "fp32" else 4.0
+            if available_gpu_gb < required_gpu_gb:
+                raise RuntimeError(
+                    f"Not enough GPU memory to load {meta.name} "
+                    f"({available_gpu_gb:.1f} GB available, {required_gpu_gb:.1f} GB required)"
+                )
 
     def unload_model(self, name: str):
         """Unload a model from memory/GPU to free up resources."""
@@ -204,9 +259,13 @@ class ModelManager:
             del model
             gc.collect()
             if torch.cuda.is_available():
+                torch.cuda.synchronize()
                 torch.cuda.empty_cache()
+                if hasattr(torch.cuda, "ipc_collect"):
+                    torch.cuda.ipc_collect()
             if self._active_model_name == name:
                 self._active_model_name = None
+                self._active_precision = None
             print(f"Unloaded model: {name}")
 
     def list_all_models(self) -> List[str]:

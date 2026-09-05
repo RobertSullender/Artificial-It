@@ -17,6 +17,7 @@ Artificial-It is a desktop application for generating images, chat, dataset prep
  - Token counter(SD1.5 only supports 77 token prompts)
  - Status on the left, progress on the right
  - Working sampler selection (Euler a, DPM++ 2M, DDIM, Euler, and UniPC)
+ - Precision selection (FP16, BF16, and FP32; FP8 is shown but not supported by standard Diffusers inference)
  - Resource Monitor
  - Empty tabs: Talk-2-It, Structure-It, and Train-It(**Coming Soon!**)
 

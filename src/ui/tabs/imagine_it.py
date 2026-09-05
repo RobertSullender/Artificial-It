@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdi
 from PyQt6.QtCore import QTimer, QDateTime, Qt
 from ui.components.preview_widget import PreviewWidget
 from utils.token_counter import TokenCounter
+from utils.config_manager import settings
 from core.model_manager import ModelManager
 import uuid
 import os
@@ -141,6 +142,13 @@ class ImagineItTab(QWidget):
         res_layout.addWidget(self.sampler_input)
         form_layout.addRow("Resolution & Sampler:", res_layout)
 
+        self.precision_input = QComboBox()
+        self.precision_input.addItems(
+            settings.get("hardware.available_precisions", ["fp8", "fp16", "bf16", "fp32"])
+        )
+        self.precision_input.setCurrentText(settings.get("hardware.precision", "fp16"))
+        form_layout.addRow("Precision:", self.precision_input)
+
         input_group.addLayout(form_layout)
 
         # Generate Button
@@ -186,6 +194,17 @@ class ImagineItTab(QWidget):
                 self.sampler_input.setCurrentText("Euler a")
             self.update_token_counts()
 
+    def set_live_preview_enabled(self, enabled):
+        if enabled:
+            self.live_status_label.setEnabled(True)
+            self.live_progress_label.setEnabled(True)
+            self.live_status_label.setText("Ready")
+        else:
+            self.live_status_label.setEnabled(False)
+            self.live_progress_label.setEnabled(False)
+            self.live_status_label.setText("Preview Off")
+            self.live_progress_label.setText("--")
+
     def update_token_counts(self):
         p_count = TokenCounter.count_tokens(self.prompt_input.text())
         n_count = TokenCounter.count_tokens(self.negative_prompt_input.text())
@@ -229,6 +248,7 @@ class ImagineItTab(QWidget):
                 'width': self.width_input.value(),
                 'height': self.height_input.value(),
                 'sampler': self.sampler_input.currentText(),
+                'precision': self.precision_input.currentText(),
             }
             try:
                 self.engine.submit_task(task_id, params)
