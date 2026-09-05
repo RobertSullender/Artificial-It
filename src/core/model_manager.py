@@ -2,7 +2,7 @@
 import os
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
-from diffusers import StableDiffusionPipeline
+from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
 import torch
 from utils.config_manager import settings
 
@@ -15,6 +15,10 @@ class ModelMetadata:
     params: dict = field(default_factory=dict)
     default_sampler: str = "Euler a"
     default_scheduler: str = "normal"
+    family: str = "sd15"
+    prompt_limit: int = 77
+    default_width: int = 512
+    default_height: int = 512
 
 class ModelManager:
     def __init__(self):
@@ -32,12 +36,25 @@ class ModelManager:
         if os.path.exists(sd15_path):
             # Added professional defaults for SD1.5
             self.register_model("sd15", "checkpoint", sd15_path, "Stable Diffusion v1.5 Pruned", 
-                                 default_sampler="Euler a", default_scheduler="normal")
+                                 default_sampler="Euler a", default_scheduler="normal",
+                                 family="sd15", prompt_limit=77,
+                                 default_width=512, default_height=512)
         else:
             print(f"Warning: SD 1.5 model not found at {sd15_path}")
 
+        sdxl_path = os.path.join(self.base_path, "sd_xl_base_1.0.safetensors")
+        if os.path.exists(sdxl_path):
+            self.register_model("sdxl", "checkpoint", sdxl_path, "Stable Diffusion XL Base 1.0",
+                                default_sampler="Euler", default_scheduler="normal",
+                                family="sdxl", prompt_limit=77,
+                                default_width=1024, default_height=1024)
+        else:
+            print(f"Warning: SDXL model not found at {sdxl_path}")
+
     def register_model(self, name: str, model_type: str, path: str, description: str = "", 
-                        default_sampler: str = "Euler a", default_scheduler: str = "normal"):
+                        default_sampler: str = "Euler a", default_scheduler: str = "normal",
+                        family: str = "sd15", prompt_limit: int = 77,
+                        default_width: int = 512, default_height: int = 512):
         """Register a model's metadata without loading it into memory."""
         if not os.path.exists(path):
             print(f"Warning: Path {path} for model {name} does not exist.")
@@ -48,7 +65,11 @@ class ModelManager:
             path=path,
             description=description,
             default_sampler=default_sampler,
-            default_scheduler=default_scheduler
+            default_scheduler=default_scheduler,
+            family=family,
+            prompt_limit=prompt_limit,
+            default_width=default_width,
+            default_height=default_height
         )
 
     def get_model_list(self, model_type: Optional[str] = None) -> List[ModelMetadata]:
@@ -69,13 +90,14 @@ class ModelManager:
         meta = self.models[name]
         print(f"Loading model: {meta.name} from {meta.path}...")
         
-        # Specific logic for SD 1.5 .safetensors files
         if meta.type == 'checkpoint' and meta.path.endswith('.safetensors'):
             try:
-                model = StableDiffusionPipeline.from_single_file(
+                pipeline_class = self.get_pipeline_class(meta)
+                model = pipeline_class.from_single_file(
                     meta.path,
                     torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                    use_safetensors=True
+                    use_safetensors=True,
+                    local_files_only=True
                 )
                 if torch.cuda.is_available():
                     model.to("cuda")
@@ -85,7 +107,7 @@ class ModelManager:
                 self._loaded_objects[name] = model
                 return model
             except Exception as e:
-                print(f"Failed to load SD model: {e}")
+                print(f"Failed to load {meta.family} model '{name}': {e}")
                 return None
         
         # Fallback for other types (placeholders)
@@ -101,3 +123,12 @@ class ModelManager:
 
     def list_all_models(self) -> List[str]:
         return list(self.models.keys())
+
+    @staticmethod
+    def get_pipeline_class(meta: ModelMetadata):
+        """Return the Diffusers pipeline class required by a model family."""
+        if meta.family == "sdxl":
+            return StableDiffusionXLPipeline
+        if meta.family == "sd15":
+            return StableDiffusionPipeline
+        raise ValueError(f"Unsupported diffusion model family: {meta.family}")

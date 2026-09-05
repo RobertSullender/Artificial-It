@@ -118,11 +118,13 @@ class ImagineItTab(QWidget):
         res_layout = QHBoxLayout()
         self.width_input = QSpinBox()
         self.width_input.setRange(64, 2048)
+        self.width_input.setSingleStep(8)
         self.width_input.setValue(512)
         self.width_input.setSuffix(" W")
 
         self.height_input = QSpinBox()
         self.height_input.setRange(64, 2048)
+        self.height_input.setSingleStep(8)
         self.height_input.setValue(512)
         self.height_input.setSuffix(" H")
 
@@ -168,16 +170,20 @@ class ImagineItTab(QWidget):
     def on_model_changed(self, model_name):     
         meta = self.model_manager.models.get(model_name)
         if meta:
+            self.width_input.setValue(meta.default_width)
+            self.height_input.setValue(meta.default_height)
             available_samplers = [self.sampler_input.itemText(i) for i in range(self.sampler_input.count())]
             if meta.default_sampler in available_samplers:
                 self.sampler_input.setCurrentText(meta.default_sampler)
             else:
                 self.sampler_input.setCurrentText("Euler a")
+            self.update_token_counts()
 
     def update_token_counts(self):
         p_count = TokenCounter.count_tokens(self.prompt_input.text())
         n_count = TokenCounter.count_tokens(self.negative_prompt_input.text())
-        limit = 77 # Hardcoded for SD1.5 as per current project scope
+        meta = self.model_manager.models.get(self.model_selector.currentText())
+        limit = meta.prompt_limit if meta else TokenCounter.get_limit()
 
         # Update Prompt Count
         self.prompt_token_count.setText(f"{p_count} / {limit}")
@@ -196,8 +202,10 @@ class ImagineItTab(QWidget):
     def handle_generation(self):
         prompt = self.prompt_input.text()
         neg_prompt = self.negative_prompt_input.text()
+        meta = self.model_manager.models.get(self.model_selector.currentText())
+        limit = meta.prompt_limit if meta else TokenCounter.get_limit()
         
-        if prompt and TokenCounter.count_tokens(prompt) <= 77:
+        if prompt and TokenCounter.count_tokens(prompt) <= limit:
             # Update UI state immediately
             self.generate_button.setEnabled(False)
             self.status_label.setText("Initializing...")
@@ -215,8 +223,8 @@ class ImagineItTab(QWidget):
                 'sampler': self.sampler_input.currentText(),
             }
             self.engine.submit_task(task_id, params)
-        elif TokenCounter.count_tokens(prompt) > 77:
-            self.status_label.setText("Error: Prompt exceeds 77 tokens!")
+        elif TokenCounter.count_tokens(prompt) > limit:
+            self.status_label.setText(f"Error: Prompt exceeds {limit} tokens!")
         else:
             self.status_label.setText("Error: Prompt is empty.")
 
@@ -254,7 +262,17 @@ class ImagineItTab(QWidget):
     def _do_update_live_preview(self, data):
         """Actual update logic - runs on main thread."""
         status = data.get('status', '')
-        
+        percent = data.get('percentage')
+
+        if percent is not None:
+            try:
+                percent_value = float(percent)
+                self.live_status_label.setText(status if status else "Generating...")
+                self.live_progress_label.setText(f"{int(percent_value)}%")
+                return
+            except Exception:
+                pass
+
         if 'Step' in status and '/' in status:
             # Extract step numbers like "Step 5/20"
             try:
@@ -262,7 +280,7 @@ class ImagineItTab(QWidget):
                 current_step = int(parts[0].replace('Step', '').strip())
                 total_steps = int(parts[1].strip())
                 percent = (current_step / total_steps) * 100
-                
+
                 self.live_status_label.setText(f"Generating: {status}")
                 self.live_progress_label.setText(f"{int(percent)}%")
             except Exception as ex:

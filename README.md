@@ -23,7 +23,7 @@ Artificial-It is a desktop application for generating images, chat, dataset prep
 ## Prerequisites
  - python >=3.12
  - pip for installing dependencies/requirements.
- - GPU with enough VRAM to load the full-merged-checkpoint(UNet, VAE, Clip), 8GB Suggested-Minimum.
+ - GPU with enough VRAM to load the full-merged-checkpoint (UNet, VAE, and CLIP). SD 1.5 may run with around 8GB; SDXL generally needs more VRAM, especially at 1024x1024.
 
 ## Installation (Ubuntu 26.04)
 
@@ -67,7 +67,14 @@ python src/main.py
 
  - **Step (8)**: Download the model.
     - https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/blob/main/v1-5-pruned.safetensors
-    - Place the v1-5-pruned.safetensors file in the auto-generated models folder.
+   - https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
+   - Place `v1-5-pruned.safetensors` and/or `sd_xl_base_1.0.safetensors` in the auto-generated `models` folder.
+
+## SDXL Offline Loading
+
+Artificial-It loads the merged SDXL checkpoint with Diffusers in offline mode. The checkpoint contains the model weights, but Diffusers also needs the matching SDXL configuration, tokenizers, and CLIP text-encoder files to be available in the local Hugging Face cache or provided through a local configuration. The application will not download missing assets during model loading.
+
+Select `sdxl` in Imagine-It to use the SDXL base pipeline. Its default generation size is 1024x1024; generation dimensions must be multiples of 8.
 
 ## Notes
  - Closing the terminal, used to start the application, will kill the application.

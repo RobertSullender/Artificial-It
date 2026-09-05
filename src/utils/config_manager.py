@@ -14,7 +14,12 @@ class ConfigManager:
         "defaults": {
             "steps": 20,
             "guidance_scale": 7.5,
-            "seed": -1
+            "seed": -1,
+            "resolution": {
+                "width": 512,
+                "height": 512
+            },
+            "sampler": "Euler a"
         },
         "hardware": {
             "use_cuda": True,
