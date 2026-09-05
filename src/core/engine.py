@@ -20,6 +20,16 @@ class ExecutionEngine(QObject):
     task_completed = pyqtSignal(str, str)
     error_occurred = pyqtSignal(str, str)
 
+    @staticmethod
+    def format_error(error: Exception, operation: str = "Generation") -> str:
+        """Return a concise single-line message for the UI."""
+        message = str(error).replace("\n", " ").strip()
+        if isinstance(error, torch.cuda.OutOfMemoryError) or "out of memory" in message.lower():
+            return "Out of memory"
+        if operation == "Model load":
+            return "Model load failed"
+        return f"{operation} failed"
+
     def __init__(self, model_manager: ModelManager):
         super().__init__()
         self.model_manager = model_manager
@@ -236,8 +246,9 @@ class ExecutionEngine(QObject):
         except Exception as e:
             import traceback
             print(traceback.format_exc())
-            self.error_occurred.emit(task_id, str(e))
-            self.progress_updated.emit({"task_id": task_id, "status": f"Error: {str(e)}"})
+            short_error = self.format_error(e, "Model load" if "load model" in str(e).lower() else "Generation")
+            self.error_occurred.emit(task_id, short_error)
+            self.progress_updated.emit({"task_id": task_id, "status": f"Error: {short_error}"})
         finally:
             pass
 

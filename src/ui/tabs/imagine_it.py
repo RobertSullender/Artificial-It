@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
                              QPushButton, QFormLayout, QSpinBox, QComboBox, QApplication)
-from PyQt6.QtCore import QTimer, QDateTime
+from PyQt6.QtCore import QTimer, QDateTime, Qt
 from ui.components.preview_widget import PreviewWidget
 from utils.token_counter import TokenCounter
 from core.model_manager import ModelManager
@@ -43,6 +43,8 @@ class ImagineItTab(QWidget):
             border-bottom: 4px solid #00ff88;
             min-height: 20px;
         """)
+        self.live_status_label.setWordWrap(False)
+        self.live_status_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
 
         self.live_progress_label = QLabel("0%")
         self.live_progress_label.setStyleSheet("""
@@ -152,6 +154,9 @@ class ImagineItTab(QWidget):
         # --- STATUS SECTION ---
         self.status_label = QLabel("Ready")
         self.status_label.setStyleSheet("color: #aaa; font-style: italic;")
+        self.status_label.setWordWrap(False)
+        self.status_label.setMinimumWidth(0)
+        self.status_label.setMaximumHeight(28)
         self.layout.addWidget(self.status_label)
 
 
@@ -285,7 +290,7 @@ class ImagineItTab(QWidget):
         if percent is not None:
             try:
                 percent_value = float(percent)
-                self.live_status_label.setText(status if status else "Generating...")
+                self.live_status_label.setText(self._compact_status(status if status else "Generating..."))
                 self.live_progress_label.setText(f"{int(percent_value)}%")
                 return
             except Exception:
@@ -299,12 +304,19 @@ class ImagineItTab(QWidget):
                 total_steps = int(parts[1].strip())
                 percent = (current_step / total_steps) * 100
 
-                self.live_status_label.setText(f"Generating: {status}")
+                self.live_status_label.setText(self._compact_status(f"Generating: {status}"))
                 self.live_progress_label.setText(f"{int(percent)}%")
             except Exception as ex:
                 print(f"Error parsing progress: {ex}")
         else:
-            self.live_status_label.setText(status if status else "Processing...")
+            self.live_status_label.setText(self._compact_status(status if status else "Processing..."))
+
+    @staticmethod
+    def _compact_status(status, limit=80):
+        status = str(status).replace("\n", " ").strip()
+        if len(status) <= limit:
+            return status
+        return f"{status[:limit - 3]}..."
 
     def _check_and_display(self, filepath):
         """Internal helper to verify file exists and is ready."""

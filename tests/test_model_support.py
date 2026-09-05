@@ -1,9 +1,11 @@
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
 
-from core.model_manager import ModelManager
+from core.model_manager import ModelManager, ModelMetadata
+from core.engine import ExecutionEngine
 
 
 class ModelSupportTests(unittest.TestCase):
@@ -36,6 +38,59 @@ class ModelSupportTests(unittest.TestCase):
     def test_checkpoint_paths_are_local(self):
         for metadata in self.manager.models.values():
             self.assertTrue(Path(metadata.path).is_file())
+
+    def test_switching_models_unloads_previous_model(self):
+        class FakePipeline:
+            def to(self, device):
+                return self
+
+        first = object()
+        second = FakePipeline()
+        self.manager._loaded_objects["first"] = first
+        self.manager._active_model_name = "first"
+        with patch.object(self.manager, "_load_checkpoint", return_value=second), patch(
+            "core.model_manager.torch.cuda.is_available", return_value=False
+        ):
+            self.manager.models["second"] = ModelMetadata(
+                name="second",
+                type="checkpoint",
+                path=self.manager.models["v1-5-pruned.safetensors"].path,
+            )
+            loaded = self.manager.load_model("second")
+        self.assertIs(loaded, second)
+        self.assertNotIn("first", self.manager._loaded_objects)
+
+    def test_error_formatter_compacts_oom(self):
+        error = RuntimeError("CUDA out of memory\nallocation details")
+        self.assertEqual(ExecutionEngine.format_error(error), "Out of memory")
+
+    def test_same_model_reuses_loaded_object(self):
+        loaded = object()
+        self.manager._loaded_objects["v1-5-pruned.safetensors"] = loaded
+        self.manager._active_model_name = "v1-5-pruned.safetensors"
+        with patch.object(self.manager, "_load_checkpoint") as load_checkpoint:
+            self.assertIs(
+                self.manager.load_model("v1-5-pruned.safetensors"),
+                loaded,
+            )
+        load_checkpoint.assert_not_called()
+
+    def test_failed_load_clears_active_model(self):
+        self.manager._loaded_objects["old"] = object()
+        self.manager._active_model_name = "old"
+        with patch.object(
+            self.manager,
+            "_load_checkpoint",
+            side_effect=RuntimeError("conversion failed"),
+        ), patch("core.model_manager.torch.cuda.is_available", return_value=False):
+            self.manager.models["broken"] = ModelMetadata(
+                name="broken",
+                type="checkpoint",
+                path=self.manager.models["v1-5-pruned.safetensors"].path,
+            )
+            self.assertIsNone(self.manager.load_model("broken"))
+        self.assertNotIn("broken", self.manager._loaded_objects)
+        self.assertIsNone(self.manager._active_model_name)
 
 
 if __name__ == "__main__":

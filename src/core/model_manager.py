@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 import os
+import gc
 from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
@@ -27,6 +28,7 @@ class ModelManager:
         # Maps model names to their metadata and the actual loaded object
         self.models: Dict[str, ModelMetadata] = {}
         self._loaded_objects: Dict[str, object] = {}
+        self._active_model_name: Optional[str] = None
         
         # Get base path from config manager
         self.base_path = os.path.abspath(settings.get('paths.models_dir'))
@@ -155,38 +157,56 @@ class ModelManager:
         if name in self._loaded_objects:
             return self._loaded_objects[name]
 
+        if self._active_model_name and self._active_model_name != name:
+            self.unload_model(self._active_model_name)
+
         meta = self.models[name]
         print(f"Loading model: {meta.name} from {meta.path}...")
         
         if meta.type == 'checkpoint' and meta.path.endswith('.safetensors'):
             try:
-                pipeline_class = self.get_pipeline_class(meta)
-                model = pipeline_class.from_single_file(
-                    meta.path,
-                    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                    use_safetensors=True,
-                    local_files_only=True
-                )
+                model = self._load_checkpoint(meta)
                 if torch.cuda.is_available():
                     model.to("cuda")
                 else:
                     model.to("cpu")
                 
                 self._loaded_objects[name] = model
+                self._active_model_name = name
                 return model
             except Exception as e:
                 print(f"Failed to load {meta.family} model '{name}': {e}")
+                self._loaded_objects.pop(name, None)
+                self._active_model_name = None
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
                 return None
         
         # Fallback for other types (placeholders)
         loaded_obj = f"LoadedObject({meta.name})"
         self._loaded_objects[name] = loaded_obj
+        self._active_model_name = name
         return loaded_obj
+
+    def _load_checkpoint(self, meta: ModelMetadata):
+        pipeline_class = self.get_pipeline_class(meta)
+        return pipeline_class.from_single_file(
+            meta.path,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            use_safetensors=True,
+            local_files_only=True
+        )
 
     def unload_model(self, name: str):
         """Unload a model from memory/GPU to free up resources."""
         if name in self._loaded_objects:
-            del self._loaded_objects[name]
+            model = self._loaded_objects.pop(name)
+            del model
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            if self._active_model_name == name:
+                self._active_model_name = None
             print(f"Unloaded model: {name}")
 
     def list_all_models(self) -> List[str]:
