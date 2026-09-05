@@ -56,6 +56,39 @@ class ExecutionEngine(QObject):
             raise ValueError(f"Unsupported sampler: {sampler}")
         return scheduler_class.from_config(current_scheduler.config)
 
+    @staticmethod
+    def resolve_batch_seed(seed, batch_index, timestamp=None):
+        """Return a stable per-image seed for a batch."""
+        base_seed = int(timestamp if timestamp is not None else datetime.now().timestamp()) if seed == -1 else int(seed)
+        return base_seed + int(batch_index)
+
+    @staticmethod
+    def seed_runtime(seed):
+        torch.manual_seed(int(seed))
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(int(seed))
+
+    @staticmethod
+    def pipeline_device(pipeline):
+        try:
+            return next(pipeline.unet.parameters()).device
+        except (AttributeError, StopIteration):
+            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    @staticmethod
+    def prepare_seeded_latents(pipeline, seed, width, height):
+        """Create the exact initial noise tensor used by a seeded generation."""
+        device = ExecutionEngine.pipeline_device(pipeline)
+        dtype = next(pipeline.unet.parameters()).dtype
+        shape = (
+            1,
+            pipeline.unet.config.in_channels,
+            height // pipeline.vae_scale_factor,
+            width // pipeline.vae_scale_factor,
+        )
+        generator = torch.Generator(device=device).manual_seed(int(seed))
+        return torch.randn(shape, generator=generator, device=device, dtype=dtype)
+
     def save_generated_image(self, image, model_name, model_meta, precision, prompt,
                              negative_prompt, steps, guidance_scale, seed, sampler,
                              width, height):
@@ -114,6 +147,48 @@ class ExecutionEngine(QObject):
 
 
     async def run_task(self, task_id: str, params: Dict[str, Any]):
+        batch_count = max(1, int(params.get("batch_count", 1)))
+        base_seed = self.resolve_batch_seed(params.get("seed", settings.get("defaults.seed")), 0)
+        if batch_count == 1:
+            return await self._run_task_once(
+                task_id,
+                {**params, "seed": base_seed, "batch_index": 0},
+                emit_completion=True,
+            )
+
+        for image_index in range(batch_count):
+            self.progress_updated.emit({
+                "task_id": task_id,
+                "status": f"Batch image {image_index + 1}/{batch_count}",
+                "percentage": (image_index / batch_count) * 100,
+            })
+            result = await self._run_task_once(
+                task_id,
+                {
+                    **params,
+                    "seed": base_seed + image_index,
+                    "batch_index": image_index,
+                    "batch_count": batch_count,
+                },
+                emit_completion=False,
+            )
+            if result is None:
+                return None
+
+        self.progress_updated.emit({
+            "task_id": task_id,
+            "status": "Batch Complete!",
+            "percentage": 100,
+        })
+        self.task_completed.emit(task_id, result)
+        return result
+
+    async def _run_task_once(
+        self,
+        task_id: str,
+        params: Dict[str, Any],
+        emit_completion: bool,
+    ):
         """
         The main entry point for any AI generation request.
         params might look like: {'model': 'flux_dev', 'prompt': 'a cat...', 'steps': 20}
@@ -155,50 +230,37 @@ class ExecutionEngine(QObject):
                 negative_prompt = params.get('negative_prompt', '')
                 num_inference_steps = params.get('steps', settings.get('defaults.steps'))
                 guidance_scale = params.get('guidance_scale', settings.get('defaults.guidance_scale'))
-                seed = params.get('seed', settings.get('defaults.seed'))
-                effective_seed = (
-                    int(datetime.now().timestamp()) if seed == -1 else int(seed)
-                )
+                effective_seed = int(params.get("seed", settings.get("defaults.seed")))
+                self.progress_updated.emit({
+                    "task_id": task_id,
+                    "status": f"Seed {effective_seed}",
+                })
                 default_width = model_meta.default_width if model_meta else settings.get('defaults.resolution.width')
                 default_height = model_meta.default_height if model_meta else settings.get('defaults.resolution.height')
                 width = params.get('width', default_width)
                 height = params.get('height', default_height)
                 sampler = params.get('sampler', settings.get('defaults.sampler'))
-                preview_latents = {"value": None}
-
                 original_scheduler = model_obj.scheduler
                 selected_scheduler = self.create_scheduler(original_scheduler, sampler)
                 model_obj.scheduler = selected_scheduler
-                original_scheduler_step = selected_scheduler.step
 
-                def scheduler_step_for_preview(*args, **kwargs):
-                    requested_return_dict = kwargs.get("return_dict", True)
-                    kwargs["return_dict"] = True
-                    scheduler_output = original_scheduler_step(*args, **kwargs)
-                    preview_latents["value"] = getattr(
-                        scheduler_output, "pred_original_sample", None
-                    )
-                    if requested_return_dict:
-                        return scheduler_output
-                    return (scheduler_output.prev_sample,)
-
-                model_obj.scheduler.step = scheduler_step_for_preview
-
-                # Handle Seed logic (reproducibility)
-                if seed == -1:
-                    generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu").manual_seed(effective_seed)
-                else:
-                    generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu").manual_seed(effective_seed)
+                initial_latents = self.prepare_seeded_latents(
+                    model_obj,
+                    effective_seed,
+                    width,
+                    height,
+                )
+                self.seed_runtime(effective_seed)
 
                 # Define a callback to capture intermediate previews
                 # NOTE: Diffusers v0.31+ uses signature: callback(step_idx, t, latents)
                 def callback_on_step_end(pipe, step_idx, t, callback_kwargs):
                     latents = callback_kwargs.get("latents")
-                    clean_latents = preview_latents["value"]
+                    clean_latents = None
                     preview_path = None
                     if latents is not None and settings.get("ui.live_preview", True):
                         with torch.no_grad():
-                            preview_latent = clean_latents if clean_latents is not None else latents
+                            preview_latent = latents.detach().clone()
                             has_latents_mean = getattr(model_obj.vae.config, "latents_mean", None) is not None
                             has_latents_std = getattr(model_obj.vae.config, "latents_std", None) is not None
                             if has_latents_mean and has_latents_std:
@@ -272,7 +334,7 @@ class ExecutionEngine(QObject):
                             guidance_scale=guidance_scale,
                             width=width,
                             height=height,
-                            generator=generator,
+                            latents=initial_latents,
                             callback_on_step_end=callback_on_step_end,
                             callback_on_step_end_tensor_inputs=["latents"],
                         )
@@ -284,7 +346,6 @@ class ExecutionEngine(QObject):
                     try:
                         image = future.result()
                     finally:
-                        selected_scheduler.step = original_scheduler_step
                         model_obj.scheduler = original_scheduler
                 
                 save_path = self.save_generated_image(
@@ -303,11 +364,12 @@ class ExecutionEngine(QObject):
                 )
 
                 result = str(save_path)
-                self.progress_updated.emit({
-                    "task_id": task_id,
-                    "status": "Generation Complete!",
-                    "percentage": 100,
-                })
+                if emit_completion:
+                    self.progress_updated.emit({
+                        "task_id": task_id,
+                        "status": "Generation Complete!",
+                        "percentage": 100,
+                    })
 
                 # Clean up intermediate preview files only after generation is complete.
                 if self.preview_dir.exists():
@@ -333,7 +395,9 @@ class ExecutionEngine(QObject):
                 self.progress_updated.emit({"task_id": task_id, "status": "Completed"})
 
             # 3. Completion
-            self.task_completed.emit(task_id, result)
+            if emit_completion:
+                self.task_completed.emit(task_id, result)
+            return result
 
         except Exception as e:
             import traceback
@@ -341,6 +405,7 @@ class ExecutionEngine(QObject):
             short_error = self.format_error(e, "Model load" if "load model" in str(e).lower() else "Generation")
             self.error_occurred.emit(task_id, short_error)
             self.progress_updated.emit({"task_id": task_id, "status": f"Error: {short_error}"})
+            return None
         finally:
             pass
 

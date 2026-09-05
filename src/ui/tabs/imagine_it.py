@@ -118,6 +118,12 @@ class ImagineItTab(QWidget):
         seed_layout.addWidget(self.cfg_input)
         form_layout.addRow("Parameters:", seed_layout)
 
+        self.batch_input = QSpinBox()
+        self.batch_input.setRange(1, 100)
+        self.batch_input.setValue(1)
+        self.batch_input.setSuffix(" Images")
+        form_layout.addRow("Batch:", self.batch_input)
+
         # Pro Parameters Row 2: Resolution, Sampler
         res_layout = QHBoxLayout()
         self.width_input = QSpinBox()
@@ -255,6 +261,7 @@ class ImagineItTab(QWidget):
                 'height': self.height_input.value(),
                 'sampler': self.sampler_input.currentText(),
                 'precision': self.precision_input.currentText(),
+                'batch_count': self.batch_input.value(),
             }
             try:
                 self.engine.submit_task(task_id, params)

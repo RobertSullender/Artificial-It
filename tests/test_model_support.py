@@ -121,6 +121,55 @@ class ModelSupportTests(unittest.TestCase):
             finally:
                 settings.set("paths.output_dir", original_output_dir)
 
+    def test_batch_seed_progression_is_deterministic(self):
+        self.assertEqual(ExecutionEngine.resolve_batch_seed(123, 0), 123)
+        self.assertEqual(ExecutionEngine.resolve_batch_seed(123, 1), 124)
+        self.assertEqual(ExecutionEngine.resolve_batch_seed(-1, 2, timestamp=500), 502)
+
+    def test_single_image_fixed_seed_is_unchanged(self):
+        self.assertEqual(ExecutionEngine.resolve_batch_seed(1788631357, 0), 1788631357)
+
+    def test_pipeline_device_uses_loaded_pipeline(self):
+        class FakePipeline:
+            class Unet:
+                def parameters(self):
+                    yield type("Parameter", (), {"device": torch.device("cpu")})()
+
+            unet = Unet()
+
+        self.assertEqual(ExecutionEngine.pipeline_device(FakePipeline()), torch.device("cpu"))
+
+    def test_seeded_latents_are_repeatable(self):
+        class FakeParameter:
+            dtype = torch.float32
+            device = torch.device("cpu")
+
+        class FakeUnet:
+            config = type("Config", (), {"in_channels": 4})()
+
+            def parameters(self):
+                yield FakeParameter()
+
+        class FakeScheduler:
+            init_noise_sigma = 2.0
+
+        class FakePipeline:
+            unet = FakeUnet()
+            vae_scale_factor = 8
+            scheduler = FakeScheduler()
+
+        first = ExecutionEngine.prepare_seeded_latents(FakePipeline(), 10, 512, 512)
+        second = ExecutionEngine.prepare_seeded_latents(FakePipeline(), 10, 512, 512)
+        self.assertTrue(torch.equal(first, second))
+        self.assertLessEqual(float(first.abs().max()), 5.0)
+
+    def test_runtime_seed_repeats_cpu_random_values(self):
+        ExecutionEngine.seed_runtime(42)
+        first = torch.rand(4)
+        ExecutionEngine.seed_runtime(42)
+        second = torch.rand(4)
+        self.assertTrue(torch.equal(first, second))
+
     def test_precision_resolution(self):
         self.assertEqual(self.manager.normalize_precision("float16"), "fp16")
         self.assertIs(self.manager.resolve_dtype("fp16"), torch.float16)
