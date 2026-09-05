@@ -163,15 +163,26 @@ class ModelManager:
         if name in self._loaded_objects and self._active_precision == requested_precision:
             return self._loaded_objects[name]
 
+        meta = self.models[name]
+        try:
+            self._check_load_resources(meta, requested_precision, check_available_gpu=False)
+        except Exception as error:
+            print(f"Refusing unsafe load for {meta.name}: {error}")
+            return None
+
         if self._active_model_name:
             self.unload_model(self._active_model_name)
 
-        meta = self.models[name]
+        try:
+            self._check_load_resources(meta, requested_precision, check_available_gpu=True)
+        except Exception as error:
+            print(f"Refusing load after cleanup for {meta.name}: {error}")
+            return None
+
         print(f"Loading model: {meta.name} from {meta.path}...")
         
         if meta.type == 'checkpoint' and meta.path.endswith('.safetensors'):
             try:
-                self._check_load_resources(meta, requested_precision)
                 model = self._load_checkpoint(meta, requested_precision)
                 if torch.cuda.is_available():
                     model.to("cuda")
@@ -218,6 +229,15 @@ class ModelManager:
             "fp32": torch.float32,
         }[precision]
 
+    @staticmethod
+    def precision_supported(precision: str) -> bool:
+        precision = ModelManager.normalize_precision(precision)
+        if precision == "fp8":
+            return False
+        if precision == "bf16" and torch.cuda.is_available():
+            return torch.cuda.is_bf16_supported()
+        return True
+
     def _load_checkpoint(self, meta: ModelMetadata, precision: str):
         pipeline_class = self.get_pipeline_class(meta)
         return pipeline_class.from_single_file(
@@ -228,7 +248,11 @@ class ModelManager:
         )
 
     @staticmethod
-    def _check_load_resources(meta: ModelMetadata, precision: str) -> None:
+    def _check_load_resources(
+        meta: ModelMetadata,
+        precision: str,
+        check_available_gpu: bool = True,
+    ) -> None:
         """Reject high-risk native loads before Torch can fail outside Python."""
         checkpoint_size_gb = os.path.getsize(meta.path) / (1024 ** 3)
         available_ram_gb = psutil.virtual_memory().available / (1024 ** 3)
@@ -242,11 +266,18 @@ class ModelManager:
         if torch.cuda.is_available():
             free_bytes, _ = torch.cuda.mem_get_info()
             available_gpu_gb = free_bytes / (1024 ** 3)
+            _, total_bytes = torch.cuda.mem_get_info()
+            total_gpu_gb = total_bytes / (1024 ** 3)
             if meta.family == "sdxl":
-                required_gpu_gb = 14.0 if precision == "fp32" else 8.0
+                required_gpu_gb = 20.0 if precision == "fp32" else 8.0
             else:
                 required_gpu_gb = 7.0 if precision == "fp32" else 4.0
-            if available_gpu_gb < required_gpu_gb:
+            if meta.family == "sdxl" and precision == "fp32" and total_gpu_gb < required_gpu_gb:
+                raise RuntimeError(
+                    f"SDXL FP32 requires a GPU with at least {required_gpu_gb:.0f} GB; "
+                    f"detected {total_gpu_gb:.1f} GB"
+                )
+            if check_available_gpu and available_gpu_gb < required_gpu_gb:
                 raise RuntimeError(
                     f"Not enough GPU memory to load {meta.name} "
                     f"({available_gpu_gb:.1f} GB available, {required_gpu_gb:.1f} GB required)"
@@ -256,10 +287,15 @@ class ModelManager:
         """Unload a model from memory/GPU to free up resources."""
         if name in self._loaded_objects:
             model = self._loaded_objects.pop(name)
+            if torch.cuda.is_available() and hasattr(model, "to"):
+                try:
+                    model.to("cpu")
+                    torch.cuda.synchronize()
+                except Exception as error:
+                    print(f"Warning: Could not move {name} to CPU during unload: {error}")
             del model
             gc.collect()
             if torch.cuda.is_available():
-                torch.cuda.synchronize()
                 torch.cuda.empty_cache()
                 if hasattr(torch.cuda, "ipc_collect"):
                     torch.cuda.ipc_collect()

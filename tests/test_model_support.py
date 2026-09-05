@@ -82,6 +82,7 @@ class ModelSupportTests(unittest.TestCase):
     def test_fp8_is_rejected_until_supported(self):
         with self.assertRaisesRegex(ValueError, "FP8"):
             self.manager.resolve_dtype("fp8")
+        self.assertFalse(self.manager.precision_supported("fp8"))
 
     def test_resource_guard_rejects_insufficient_system_memory(self):
         meta = self.manager.models["sd_xl_base_1.0.safetensors"]
@@ -90,6 +91,17 @@ class ModelSupportTests(unittest.TestCase):
             "core.model_manager.torch.cuda.is_available", return_value=False
         ), self.assertRaisesRegex(RuntimeError, "Not enough system memory"):
             self.manager._check_load_resources(meta, "fp16")
+
+    def test_resource_guard_rejects_sdxl_fp32_on_small_gpu(self):
+        meta = self.manager.models["sd_xl_base_1.0.safetensors"]
+        memory = type("Memory", (), {"available": 32 * 1024 ** 3})()
+        with patch("core.model_manager.psutil.virtual_memory", return_value=memory), patch(
+            "core.model_manager.torch.cuda.is_available", return_value=True
+        ), patch(
+            "core.model_manager.torch.cuda.mem_get_info",
+            return_value=(15 * 1024 ** 3, 15.5 * 1024 ** 3),
+        ), self.assertRaisesRegex(RuntimeError, "SDXL FP32 requires"):
+            self.manager._check_load_resources(meta, "fp32")
 
     def test_same_model_different_precision_does_not_reuse(self):
         class FakePipeline:
@@ -108,6 +120,33 @@ class ModelSupportTests(unittest.TestCase):
         self.assertIs(loaded, second)
         self.assertIsNot(loaded, first)
         self.assertEqual(self.manager._active_precision, "fp32")
+
+    def test_precision_transition_moves_previous_pipeline_off_gpu(self):
+        class FakePipeline:
+            def __init__(self):
+                self.devices = []
+
+            def to(self, device):
+                self.devices.append(device)
+                return self
+
+        previous = FakePipeline()
+        replacement = FakePipeline()
+        self.manager._loaded_objects["v1-5-pruned.safetensors"] = previous
+        self.manager._active_model_name = "v1-5-pruned.safetensors"
+        self.manager._active_precision = "bf16"
+        with patch.object(self.manager, "_load_checkpoint", return_value=replacement), patch(
+            "core.model_manager.torch.cuda.is_available", return_value=True
+        ), patch("core.model_manager.torch.cuda.mem_get_info", return_value=(16 * 1024**3, 16 * 1024**3)), patch(
+            "core.model_manager.torch.cuda.synchronize"
+        ), patch("core.model_manager.torch.cuda.empty_cache"), patch("core.model_manager.torch.cuda.ipc_collect"), patch(
+            "core.model_manager.psutil.virtual_memory",
+            return_value=type("Memory", (), {"available": 32 * 1024**3})(),
+        ):
+            loaded = self.manager.load_model("v1-5-pruned.safetensors", "fp16")
+        self.assertIs(loaded, replacement)
+        self.assertEqual(previous.devices, ["cpu"])
+        self.assertEqual(self.manager._active_precision, "fp16")
 
     def test_sampler_selection_creates_requested_scheduler(self):
         from diffusers import EulerDiscreteScheduler

@@ -147,6 +147,12 @@ class ImagineItTab(QWidget):
             settings.get("hardware.available_precisions", ["fp8", "fp16", "bf16", "fp32"])
         )
         self.precision_input.setCurrentText(settings.get("hardware.precision", "fp16"))
+        for index in range(self.precision_input.count()):
+            precision = self.precision_input.itemText(index)
+            if not self.model_manager.precision_supported(precision):
+                item = self.precision_input.model().item(index)
+                item.setEnabled(False)
+                item.setToolTip(f"{precision} is not supported by the current backend")
         form_layout.addRow("Precision:", self.precision_input)
 
         input_group.addLayout(form_layout)

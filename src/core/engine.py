@@ -176,12 +176,16 @@ class ExecutionEngine(QObject):
                                 preview_latent = preview_latent.to(
                                     next(iter(model_obj.vae.post_quant_conv.parameters())).dtype
                                 )
+                            else:
+                                preview_latent = preview_latent.to(
+                                    next(iter(model_obj.vae.post_quant_conv.parameters())).dtype
+                                )
                             try:
                                 decoded = model_obj.vae.decode(preview_latent, return_dict=False)[0]
                             finally:
                                 if needs_upcasting:
                                     model_obj.vae.to(dtype=torch.float16)
-                            image = (decoded / 2 + 0.5).clamp(0, 1).cpu().numpy()
+                            image = (decoded / 2 + 0.5).clamp(0, 1).float().cpu().numpy()
 
                             if image.ndim == 4:
                                 image = image[0]
