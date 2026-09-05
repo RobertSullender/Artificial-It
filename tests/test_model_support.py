@@ -1,7 +1,10 @@
 import unittest
+import json
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 import torch
+from PIL import Image
 
 from diffusers import (
     DDIMScheduler,
@@ -15,6 +18,7 @@ from diffusers import (
 
 from core.model_manager import ModelManager, ModelMetadata
 from core.engine import ExecutionEngine
+from utils.config_manager import settings
 
 
 class ModelSupportTests(unittest.TestCase):
@@ -72,6 +76,50 @@ class ModelSupportTests(unittest.TestCase):
     def test_error_formatter_compacts_oom(self):
         error = RuntimeError("CUDA out of memory\nallocation details")
         self.assertEqual(ExecutionEngine.format_error(error), "Out of memory")
+
+    def test_sequential_output_metadata_does_not_backtrack(self):
+        engine = ExecutionEngine(self.manager)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_output_dir = settings.get("paths.output_dir")
+            settings.set("paths.output_dir", temp_dir)
+            try:
+                Path(temp_dir, "img_1.png").touch()
+                Path(temp_dir, "img_10.png").touch()
+                Path(temp_dir, "img_15.png").touch()
+                path = engine.save_generated_image(
+                    Image.new("RGB", (8, 8), "black"),
+                    "test-model.safetensors",
+                    self.manager.models["v1-5-pruned.safetensors"],
+                    "fp16",
+                    "a prompt",
+                    "bad quality",
+                    20,
+                    7,
+                    123,
+                    "Euler a",
+                    512,
+                    512,
+                )
+                self.assertEqual(path.name, "img_16.png")
+                self.assertTrue(path.with_suffix(".json").is_file())
+                metadata = json.loads(path.with_suffix(".json").read_text())
+                self.assertEqual(list(metadata), [
+                    "family", "model", "width", "height", "prompt",
+                    "negative_prompt", "precision", "guidance_scale", "sampler",
+                    "seed", "steps",
+                ])
+                self.assertEqual(metadata["seed"], 123)
+                embedded = Image.open(path).text["parameters"]
+                self.assertEqual(
+                    list(line.split(": ", 1)[0] for line in embedded.splitlines()),
+                    list(metadata),
+                )
+                self.assertEqual(
+                    embedded.splitlines()[0],
+                    "family: sd15",
+                )
+            finally:
+                settings.set("paths.output_dir", original_output_dir)
 
     def test_precision_resolution(self):
         self.assertEqual(self.manager.normalize_precision("float16"), "fp16")

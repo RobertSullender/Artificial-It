@@ -79,7 +79,7 @@ class MainWindow(QMainWindow):
         if self.monitor is None:
             self.monitor = ResourceMonitor()
             self.monitor.stats_updated.connect(self.update_resource_stats)
-        self.monitor.start()
+        self.monitor.start_monitor()
 
     def open_settings(self):
         dialog = SettingsDialog(self.theme_manager, self)
@@ -95,7 +95,7 @@ class MainWindow(QMainWindow):
             if self.monitor is None or not self.monitor.isRunning():
                 self.monitor = ResourceMonitor()
                 self.monitor.stats_updated.connect(self.update_resource_stats)
-                self.monitor.start()
+                self.monitor.start_monitor()
         elif self.monitor is not None:
             self.monitor.stop()
             self.stats_label.setText("Resources Off")

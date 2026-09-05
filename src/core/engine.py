@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: MIT
 import asyncio
+import json
+import re
+import threading
 from typing import Dict, Any, List
 from PyQt6.QtCore import QObject, pyqtSignal
 from core.model_manager import ModelManager
@@ -19,7 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from utils.config_manager import settings
 import numpy as np
-from PIL import Image
+from PIL import Image, PngImagePlugin
 import tempfile  # ADD: Import for temporary directory handling
 
 class ExecutionEngine(QObject):
@@ -53,10 +56,52 @@ class ExecutionEngine(QObject):
             raise ValueError(f"Unsupported sampler: {sampler}")
         return scheduler_class.from_config(current_scheduler.config)
 
+    def save_generated_image(self, image, model_name, model_meta, precision, prompt,
+                             negative_prompt, steps, guidance_scale, seed, sampler,
+                             width, height):
+        """Save an image with monotonic naming and CivitAI-compatible metadata."""
+        output_dir = Path(settings.get("paths.output_dir", "outputs"))
+        output_dir.mkdir(parents=True, exist_ok=True)
+        metadata = {
+            "family": model_meta.family if model_meta else None,
+            "model": model_name,
+            "width": width,
+            "height": height,
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "precision": precision,
+            "guidance_scale": guidance_scale,
+            "sampler": sampler,
+            "seed": seed,
+            "steps": steps,
+        }
+        parameters = "\n".join(
+            f"{key}: {value}" for key, value in metadata.items()
+        )
+
+        with self.output_lock:
+            highest = 0
+            for path in output_dir.glob("img_*.png"):
+                match = re.fullmatch(r"img_(\d+)\.png", path.name)
+                if match:
+                    highest = max(highest, int(match.group(1)))
+            image_path = output_dir / f"img_{highest + 1}.png"
+            image_path.touch(exist_ok=False)
+            png_info = PngImagePlugin.PngInfo()
+            png_info.add_text("parameters", parameters)
+            png_info.add_text("artificial_it_metadata", json.dumps(metadata))
+            image.save(str(image_path), pnginfo=png_info)
+            image_path.with_suffix(".json").write_text(
+                json.dumps(metadata, indent=2),
+                encoding="utf-8",
+            )
+        return image_path
+
     def __init__(self, model_manager: ModelManager):
         super().__init__()
         self.model_manager = model_manager
         self.current_tasks: Dict[str, asyncio.Task] = {}
+        self.output_lock = threading.Lock()
         
         # ✅ NEW: Create temp directory for all temporary files (previews, cache, etc.)
         # This moves away from outputs/ to use OS standard temp location
@@ -111,6 +156,9 @@ class ExecutionEngine(QObject):
                 num_inference_steps = params.get('steps', settings.get('defaults.steps'))
                 guidance_scale = params.get('guidance_scale', settings.get('defaults.guidance_scale'))
                 seed = params.get('seed', settings.get('defaults.seed'))
+                effective_seed = (
+                    int(datetime.now().timestamp()) if seed == -1 else int(seed)
+                )
                 default_width = model_meta.default_width if model_meta else settings.get('defaults.resolution.width')
                 default_height = model_meta.default_height if model_meta else settings.get('defaults.resolution.height')
                 width = params.get('width', default_width)
@@ -138,9 +186,9 @@ class ExecutionEngine(QObject):
 
                 # Handle Seed logic (reproducibility)
                 if seed == -1:
-                    generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu").manual_seed(int(datetime.now().timestamp()))
+                    generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu").manual_seed(effective_seed)
                 else:
-                    generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu").manual_seed(int(seed))
+                    generator = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu").manual_seed(effective_seed)
 
                 # Define a callback to capture intermediate previews
                 # NOTE: Diffusers v0.31+ uses signature: callback(step_idx, t, latents)
@@ -239,13 +287,20 @@ class ExecutionEngine(QObject):
                         selected_scheduler.step = original_scheduler_step
                         model_obj.scheduler = original_scheduler
                 
-                # Save final result
-                output_dir = Path("outputs")
-                output_dir.mkdir(parents=True, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"gen_{task_id}_{timestamp}.png"
-                save_path = output_dir / filename
-                image.save(str(save_path))
+                save_path = self.save_generated_image(
+                    image=image,
+                    model_name=model_name,
+                    model_meta=model_meta,
+                    precision=precision,
+                    prompt=prompt,
+                    negative_prompt=negative_prompt,
+                    steps=num_inference_steps,
+                    guidance_scale=guidance_scale,
+                    seed=effective_seed,
+                    sampler=sampler,
+                    width=width,
+                    height=height,
+                )
 
                 result = str(save_path)
                 self.progress_updated.emit({
