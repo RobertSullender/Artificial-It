@@ -2,7 +2,15 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
+from diffusers import (
+    DDIMScheduler,
+    DPMSolverMultistepScheduler,
+    EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
+    StableDiffusionPipeline,
+    StableDiffusionXLPipeline,
+    UniPCMultistepScheduler,
+)
 
 from core.model_manager import ModelManager, ModelMetadata
 from core.engine import ExecutionEngine
@@ -63,6 +71,26 @@ class ModelSupportTests(unittest.TestCase):
     def test_error_formatter_compacts_oom(self):
         error = RuntimeError("CUDA out of memory\nallocation details")
         self.assertEqual(ExecutionEngine.format_error(error), "Out of memory")
+
+    def test_sampler_selection_creates_requested_scheduler(self):
+        from diffusers import EulerDiscreteScheduler
+
+        current = EulerDiscreteScheduler(num_train_timesteps=1000)
+        expected = {
+            "Euler a": EulerAncestralDiscreteScheduler,
+            "DPM++ 2M": DPMSolverMultistepScheduler,
+            "DDIM": DDIMScheduler,
+            "Euler": EulerDiscreteScheduler,
+            "UniPC": UniPCMultistepScheduler,
+        }
+        for sampler, scheduler_class in expected.items():
+            scheduler = ExecutionEngine.create_scheduler(current, sampler)
+            self.assertIsInstance(scheduler, scheduler_class)
+
+    def test_unknown_sampler_is_rejected(self):
+        current = EulerDiscreteScheduler(num_train_timesteps=1000)
+        with self.assertRaises(ValueError):
+            ExecutionEngine.create_scheduler(current, "Unknown")
 
     def test_same_model_reuses_loaded_object(self):
         loaded = object()

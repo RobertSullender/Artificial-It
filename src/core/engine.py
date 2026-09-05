@@ -4,7 +4,15 @@ from typing import Dict, Any, List
 from PyQt6.QtCore import QObject, pyqtSignal
 from core.model_manager import ModelManager
 from core.loop_manager import instance as loop_manager
-from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
+from diffusers import (
+    DDIMScheduler,
+    DPMSolverMultistepScheduler,
+    EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
+    StableDiffusionPipeline,
+    StableDiffusionXLPipeline,
+    UniPCMultistepScheduler,
+)
 import torch
 import os
 from datetime import datetime
@@ -29,6 +37,21 @@ class ExecutionEngine(QObject):
         if operation == "Model load":
             return "Model load failed"
         return f"{operation} failed"
+
+    @staticmethod
+    def create_scheduler(current_scheduler, sampler):
+        """Create the requested scheduler while preserving pipeline config."""
+        scheduler_classes = {
+            "Euler a": EulerAncestralDiscreteScheduler,
+            "DPM++ 2M": DPMSolverMultistepScheduler,
+            "DDIM": DDIMScheduler,
+            "Euler": EulerDiscreteScheduler,
+            "UniPC": UniPCMultistepScheduler,
+        }
+        scheduler_class = scheduler_classes.get(sampler)
+        if scheduler_class is None:
+            raise ValueError(f"Unsupported sampler: {sampler}")
+        return scheduler_class.from_config(current_scheduler.config)
 
     def __init__(self, model_manager: ModelManager):
         super().__init__()
@@ -87,7 +110,10 @@ class ExecutionEngine(QObject):
                 sampler = params.get('sampler', settings.get('defaults.sampler'))
                 preview_latents = {"value": None}
 
-                original_scheduler_step = model_obj.scheduler.step
+                original_scheduler = model_obj.scheduler
+                selected_scheduler = self.create_scheduler(original_scheduler, sampler)
+                model_obj.scheduler = selected_scheduler
+                original_scheduler_step = selected_scheduler.step
 
                 def scheduler_step_for_preview(*args, **kwargs):
                     requested_return_dict = kwargs.get("return_dict", True)
@@ -176,9 +202,7 @@ class ExecutionEngine(QObject):
 
                 def perform_inference():
                     with torch.no_grad():
-                        # NOTE: Samplers in Diffusers v0.31+ are determined at pipeline creation time,
-                        # not per-call. The sampler parameter is stored for future use or model-specific overrides.
-                        print(f'DEBUG Sampler selected: {sampler}')
+                        print(f'DEBUG Scheduler selected: {sampler}')
 
                         # Pass the professional parameters into the pipeline call
                         output = model_obj(
@@ -200,7 +224,8 @@ class ExecutionEngine(QObject):
                     try:
                         image = future.result()
                     finally:
-                        model_obj.scheduler.step = original_scheduler_step
+                        selected_scheduler.step = original_scheduler_step
+                        model_obj.scheduler = original_scheduler
                 
                 # Save final result
                 output_dir = Path("outputs")
