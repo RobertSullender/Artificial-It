@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: MIT
 import os
+from pathlib import Path
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
+from safetensors import safe_open
 import torch
 from utils.config_manager import settings
 
@@ -31,25 +33,91 @@ class ModelManager:
         if not os.path.exists(self.base_path):
             os.makedirs(self.base_path, exist_ok=True)
 
-        # Register the actual SD 1.5 model provided by user
-        sd15_path = os.path.join(self.base_path, "v1-5-pruned.safetensors")
-        if os.path.exists(sd15_path):
-            # Added professional defaults for SD1.5
-            self.register_model("sd15", "checkpoint", sd15_path, "Stable Diffusion v1.5 Pruned", 
-                                 default_sampler="Euler a", default_scheduler="normal",
-                                 family="sd15", prompt_limit=77,
-                                 default_width=512, default_height=512)
-        else:
-            print(f"Warning: SD 1.5 model not found at {sd15_path}")
+        self.discover_models()
 
-        sdxl_path = os.path.join(self.base_path, "sd_xl_base_1.0.safetensors")
-        if os.path.exists(sdxl_path):
-            self.register_model("sdxl", "checkpoint", sdxl_path, "Stable Diffusion XL Base 1.0",
-                                default_sampler="Euler", default_scheduler="normal",
-                                family="sdxl", prompt_limit=77,
-                                default_width=1024, default_height=1024)
-        else:
-            print(f"Warning: SDXL model not found at {sdxl_path}")
+    def discover_models(self):
+        """Register supported checkpoint files without loading tensor data."""
+        self.models.clear()
+        for model_path in sorted(Path(self.base_path).glob("*.safetensors")):
+            try:
+                family = self.classify_checkpoint(model_path)
+            except Exception as error:
+                print(f"Warning: Could not inspect model {model_path.name}: {error}")
+                continue
+
+            if family == "unknown":
+                print(f"Warning: Unsupported model architecture: {model_path.name}")
+                continue
+
+            if family == "sdxl":
+                defaults = {
+                    "default_sampler": "Euler",
+                    "default_width": 1024,
+                    "default_height": 1024,
+                    "description": "Stable Diffusion XL checkpoint",
+                }
+            else:
+                defaults = {
+                    "default_sampler": "Euler a",
+                    "default_width": 512,
+                    "default_height": 512,
+                    "description": "Stable Diffusion 1.x checkpoint",
+                }
+
+            self.register_model(
+                model_path.name,
+                "checkpoint",
+                str(model_path),
+                defaults["description"],
+                default_sampler=defaults["default_sampler"],
+                default_scheduler="normal",
+                family=family,
+                prompt_limit=77,
+                default_width=defaults["default_width"],
+                default_height=defaults["default_height"],
+            )
+
+    @staticmethod
+    def classify_checkpoint(path: Path) -> str:
+        """Classify a checkpoint from its safetensors header and key names."""
+        with safe_open(str(path), framework="pt", device="cpu") as checkpoint:
+            metadata = checkpoint.metadata() or {}
+            keys = tuple(checkpoint.keys())
+
+        normalized_metadata = {
+            str(key).lower(): str(value).lower()
+            for key, value in metadata.items()
+        }
+        architecture = normalized_metadata.get("modelspec.architecture", "")
+        base_version = normalized_metadata.get("ss_base_model_version", "")
+
+        if "stable-diffusion-xl" in architecture or base_version.startswith("sdxl"):
+            return "sdxl"
+        if "stable-diffusion-v1" in architecture or base_version in {"sd1", "sd1x", "sd_1x"}:
+            return "sd15"
+
+        sdxl_markers = (
+            "conditioner.embedders.1.model.transformer.",
+            "conditioner.embedders.1.model.token_embedding.",
+            "conditioner.embedders.1.model.positional_embedding.",
+            "text_encoder_2.text_model.encoder.layers.",
+            "text_encoder_2.text_model.embeddings.",
+            "text_encoder_2.text_projection.",
+        )
+        sd15_markers = (
+            "cond_stage_model.transformer.text_model.encoder.layers.",
+            "cond_stage_model.transformer.text_model.embeddings.",
+            "text_encoder.text_model.encoder.layers.",
+            "text_encoder.text_model.embeddings.",
+            "text_encoder.text_projection.",
+        )
+        has_sdxl = any(key.startswith(marker) for key in keys for marker in sdxl_markers)
+        has_sd15 = any(key.startswith(marker) for key in keys for marker in sd15_markers)
+        if has_sdxl and not has_sd15:
+            return "sdxl"
+        if has_sd15 and not has_sdxl:
+            return "sd15"
+        return "unknown"
 
     def register_model(self, name: str, model_type: str, path: str, description: str = "", 
                         default_sampler: str = "Euler a", default_scheduler: str = "normal",

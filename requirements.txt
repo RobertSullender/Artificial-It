@@ -11,3 +11,4 @@ psutil
 pillow
 matplotlib
 diffusers
+safetensors

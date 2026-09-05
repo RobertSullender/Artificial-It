@@ -68,7 +68,9 @@ python src/main.py
  - **Step (8)**: Download the model.
     - https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/blob/main/v1-5-pruned.safetensors
    - https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
-   - Place `v1-5-pruned.safetensors` and/or `sd_xl_base_1.0.safetensors` in the auto-generated `models` folder.
+   - Place any full `.safetensors` SD 1.x or SDXL checkpoint in the auto-generated `models` folder. The application discovers compatible files automatically and shows each exact filename in the model menu.
+
+Full merged checkpoints and compatible full fine-tunes can be used. LoRA-only files, ControlNet files, and other adapter-only files are not standalone checkpoints and are not loaded by this discovery path.
 
 ## SDXL Offline Loading
 

@@ -17,6 +17,7 @@ class ImagineItTab(QWidget):
         self.layout = QVBoxLayout(self)
         self.layout.setSpacing(15)
         self._current_image_path = None
+        self._active_task_id = None
         
         # Initialize PreviewWidget early for use in callbacks
         self.preview = PreviewWidget()
@@ -158,6 +159,7 @@ class ImagineItTab(QWidget):
         self.generate_button.clicked.connect(self.handle_generation)
         self.engine.progress_updated.connect(self.on_progress_updated)
         self.engine.task_completed.connect(self.on_task_completed)
+        self.engine.error_occurred.connect(self.on_task_error)
 
         # Token Count Signals
         self.prompt_input.textChanged.connect(lambda text: self.update_token_counts())
@@ -211,6 +213,7 @@ class ImagineItTab(QWidget):
             self.status_label.setText("Initializing...")
             
             task_id = str(uuid.uuid4())
+            self._active_task_id = task_id
             params = {
                 'model': self.model_selector.currentText(),
                 'prompt': prompt,
@@ -222,19 +225,34 @@ class ImagineItTab(QWidget):
                 'height': self.height_input.value(),
                 'sampler': self.sampler_input.currentText(),
             }
-            self.engine.submit_task(task_id, params)
+            try:
+                self.engine.submit_task(task_id, params)
+            except Exception as error:
+                self._active_task_id = None
+                self.generate_button.setEnabled(True)
+                self.status_label.setText(f"Error: {error}")
         elif TokenCounter.count_tokens(prompt) > limit:
             self.status_label.setText(f"Error: Prompt exceeds {limit} tokens!")
         else:
             self.status_label.setText("Error: Prompt is empty.")
 
     def on_task_completed(self, task_id, result):
+        if task_id != self._active_task_id:
+            return
         self.generate_button.setEnabled(True)
+        self._active_task_id = None
         self.status_label.setText("Generation Complete")
         if result and result.lower().endswith(".png"):
             self.preview.display_image(result)
         else:
             self.preview.display_text(f"Done! Result: {result}")
+
+    def on_task_error(self, task_id, message):
+        if task_id != self._active_task_id:
+            return
+        self.generate_button.setEnabled(True)
+        self._active_task_id = None
+        self.status_label.setText(f"Error: {message}")
 
     def on_progress_updated(self, data):
         """Updates the live preview labels and checks if image is ready."""

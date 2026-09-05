@@ -18,7 +18,7 @@ class ExecutionEngine(QObject):
     # Signals to communicate with the UI
     progress_updated = pyqtSignal(dict)
     task_completed = pyqtSignal(str, str)
-    error_occurred = pyqtSignal(str)
+    error_occurred = pyqtSignal(str, str)
 
     def __init__(self, model_manager: ModelManager):
         super().__init__()
@@ -236,7 +236,7 @@ class ExecutionEngine(QObject):
         except Exception as e:
             import traceback
             print(traceback.format_exc())
-            self.error_occurred.emit(str(e))
+            self.error_occurred.emit(task_id, str(e))
             self.progress_updated.emit({"task_id": task_id, "status": f"Error: {str(e)}"})
         finally:
             pass
